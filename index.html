@@ -652,9 +652,26 @@ async function openReport(r){
       ${kv("حالة السؤال",r.question_active?'<span style="color:var(--green)">فعّال</span>':'<span style="color:var(--red)">معطّل</span>')}
     </div>
     ${actions}
+    ${r.reporter_id?`
+      <div class="lbl">الرد على المُبلِّغ</div>
+      <textarea class="fin" id="repReply" placeholder="اكتب رداً يصل ${esc(r.reporter||"المُبلِّغ")} في إشعاراته…"></textarea>
+      <div class="row" style="margin-top:10px"><button class="btn primary" onclick="replyReport(${r.id})">📩 إرسال الرد</button></div>`
+      :`<div class="lbl">الرد على المُبلِّغ</div><div class="empty" style="text-align:right;padding:10px 0">المُبلِّغ غير متاح (حساب محذوف).</div>`}
+    <div class="lbl">ملاحظة إدارية (خاصة)</div>
+    <textarea class="fin" id="repNote" placeholder="ملاحظة داخلية لا يراها اللاعب…">${esc(r.admin_note||"")}</textarea>
+    <div class="row" style="margin-top:10px"><button class="btn" onclick="saveReportNote(${r.id})">💾 حفظ الملاحظة</button></div>
     <div class="lbl">السؤال المُبلَّغ عنه</div>
     <div class="qbox">${esc(r.question||"— سؤال محذوف —")}${r.image_url?`<img src="${esc(r.image_url)}" alt="">`:""}</div>
     <div class="lbl">الخيارات</div>${opts||`<div class="empty">—</div>`}`);
+}
+function replyReport(id){
+  const el=document.getElementById("repReply"); const body=el?el.value.trim():"";
+  if(!body){ toast("اكتب رداً","err"); return; }
+  act(()=>rpc("admin_reply_report",{p_report_id:id,p_body:body}),"أُرسل الرد للمُبلِّغ",()=>{ if(el) el.value=""; });
+}
+function saveReportNote(id){
+  const el=document.getElementById("repNote"); const note=el?el.value:"";
+  act(()=>rpc("admin_set_report_note",{p_report_id:id,p_note:note}),"حُفظت الملاحظة");
 }
 function rAct(status,id){ act(()=>rpc("admin_resolve_report",{p_id:id,p_status:status}),"تم تحديث البلاغ",window._repRefresh); }
 async function qAct(qid,active){
@@ -705,6 +722,7 @@ async function openPlayer(id){
         ? `<button class="btn" onclick="pAct('revoke','${p.id}')">إلغاء Premium</button>`
         : `<button class="btn gold" onclick="pAct('grant','${p.id}')">👑 منح Premium</button>`}
       <button class="btn" onclick="pAct('coins','${p.id}')">🪙 تعديل العملات</button>
+      <button class="btn primary" onclick="pAct('message','${p.id}')">📩 مراسلة</button>
     </div>`;
   showModal(`👤 ${esc(p.username)} <span style="color:var(--dim);font-size:12px">${esc(p.player_code||"")}</span>`,`
     <div class="kv">
@@ -734,6 +752,26 @@ async function pAct(kind,id){
   else if(kind==="revoke"){ if(await confirmDialog("إلغاء Premium","سيُلغى اشتراك Premium فوراً. متابعة؟",true))
       act(()=>rpc("admin_set_premium",{p_id:id,p_on:false}),"تم إلغاء Premium",refresh); }
   else if(kind==="coins"){ coinsDialog(id,refresh); }
+  else if(kind==="message"){ messageDialog(id); }
+}
+// Send a player a message that shows up in their notifications as "من الإدارة".
+function messageDialog(id){
+  const ov=document.createElement("div"); ov.className="ov";
+  ov.innerHTML=`<div class="modal sm"><div class="mh"><h3>📩 مراسلة اللاعب</h3><button class="x">✕</button></div>
+    <div style="font-size:12px;color:var(--dim);margin-bottom:12px">تظهر للاعب في مركز الإشعارات باسم «الإدارة».</div>
+    <label class="flbl">العنوان (اختياري)</label>
+    <input class="fin" id="msgTitle" placeholder="📩 رسالة من الإدارة">
+    <label class="flbl" style="margin-top:10px">الرسالة</label>
+    <textarea class="fin" id="msgBody" placeholder="اكتب رسالتك للاعب…"></textarea>
+    <div class="row" style="margin-top:14px"><button class="btn primary" id="msgOk">إرسال</button></div></div>`;
+  const close=()=>ov.remove(); ov.querySelector(".x").onclick=close; ov.onclick=e=>{if(e.target===ov)close();};
+  ov.querySelector("#msgOk").onclick=()=>{
+    const body=ov.querySelector("#msgBody").value.trim(), title=ov.querySelector("#msgTitle").value.trim();
+    if(!body){ toast("اكتب رسالة","err"); return; } close();
+    act(()=>rpc("admin_message_player",{p_id:id,p_body:body,p_title:title||null}),"تم إرسال الرسالة للاعب");
+  };
+  document.body.appendChild(ov);
+  setTimeout(()=>ov.querySelector("#msgBody").focus(),50);
 }
 function pickDialog(title,hint,opts,cls,onPick){
   const ov=document.createElement("div"); ov.className="ov";
