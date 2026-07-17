@@ -441,11 +441,12 @@ function renderSnapshot(s){
     {id:"kpiOnline",ic:"🟢",l:"متصلون الآن",v:fmt(s.online_now),c:"var(--green)",sub:"اضغط لعرض القائمة ←"},
     {ic:"⚔️",l:"داخل مباريات",v:fmt(s.in_matches_now),c:"var(--primary-l)",sub:fmt(s.queue)+" في الطابور"},
     {ic:"🎯",l:"مباريات اليوم",v:fmt(s.matches_today),c:"var(--blue)",sub:fmt(s.matches_7d)+" هذا الأسبوع"},
-    {ic:"✨",l:"تسجيلات اليوم",v:fmt(s.new_today),c:"var(--text)",sub:fmt(s.total_players)+" إجمالي اللاعبين"},
-    {ic:"👑",l:"مشتركو Premium",v:fmt(s.premium_count),c:"var(--gold-l)",sub:conv+"% نسبة التحويل"},
+    {id:"kpiNew",ic:"✨",l:"تسجيلات اليوم",v:fmt(s.new_today),c:"var(--text)",sub:fmt(s.total_players)+" إجمالي · للقائمة ←"},
+    {id:"kpiPremium",ic:"👑",l:"مشتركو Premium",v:fmt(s.premium_count),c:"var(--gold-l)",sub:conv+"% تحويل · للقائمة ←"},
   ];
   $("#kpis").innerHTML=kpis.map(k=>`<div class="kpi" ${k.id?`id="${k.id}" style="cursor:pointer"`:""}><div class="r"><span class="l">${k.l}</span><span class="e">${k.ic}</span></div><div class="val v num" style="color:${k.c}">${k.v}</div><div class="s">${k.sub}</div></div>`).join("");
-  const ko=$("#kpiOnline"); if(ko) ko.onclick=openOnline;
+  const bindKpi=(id,fn)=>{const e=$("#"+id); if(e) e.onclick=fn;};
+  bindKpi("kpiOnline",openOnline); bindKpi("kpiNew",openNewPlayers); bindKpi("kpiPremium",openPremiumPlayers);
 
   const a=s.by_activity||{}; const tot=Object.values(a).reduce((x,y)=>x+y,0)||1;
   const rows=Object.entries(a).sort((x,y)=>y[1]-x[1]);
@@ -474,24 +475,28 @@ function renderSnapshot(s){
 }
 
 // ---- online players modal (search across ALL players + last seen) ----
+// One row renderer for every player list (online / new / premium / search).
+// `meta` swaps the right-hand status text; default = live activity or last seen.
+function playerRow(p, meta){
+  const on=isOnline(p.last_active);
+  const status = meta ? meta(p,on) : (on
+    ? `<span class="ac">${ACT_AR[p.activity||p.current_activity]||"• متصل"}</span>`
+    : `<span class="ac" style="color:var(--dim)">🕓 آخر ظهور ${p.last_active?timeAgo(p.last_active):"—"}</span>`);
+  return `<div class="orow" data-id="${p.id}"><span class="dot" style="${on?'':'background:var(--dim)'}"></span>
+    <span class="av" style="${on?'':'filter:grayscale(.7);opacity:.75'}">${esc((p.username||"؟").trim().charAt(0))}</span>
+    <div><div>${esc(p.username||"لاعب")} ${p.is_premium?PREM:""}${p.is_banned?'<span class="badge r">محظور</span>':""}</div>
+      <div class="cd">${esc(p.player_code||"")}</div></div>
+    <span style="flex:1"></span>${status}</div>`;
+}
+const bindRows=box=>box.querySelectorAll(".orow").forEach(el=>el.onclick=()=>openPlayer(el.dataset.id));
+
 async function openOnline(){
   let list=[]; try{ list=await rpc("admin_online_players",{p_limit:200}); }catch(e){ toast("تعذّر التحميل","err"); return; }
   const ov=showModal(`🟢 المتصلون الآن · ${fmt(list.length)} لاعب`,
     `<div style="margin-bottom:12px"><input class="fin" id="oq" placeholder="ابحث عن أي لاعب — متصل أو غير متصل…" autocomplete="off"></div>
      <div class="olist" id="olist"></div>`);
   const box=ov.querySelector("#olist"), q=ov.querySelector("#oq");
-  const row=p=>{
-    const on=isOnline(p.last_active);
-    const status=on
-      ? `<span class="ac">${ACT_AR[p.activity||p.current_activity]||"• متصل"}</span>`
-      : `<span class="ac" style="color:var(--dim)">🕓 آخر ظهور ${p.last_active?timeAgo(p.last_active):"—"}</span>`;
-    return `<div class="orow" data-id="${p.id}"><span class="dot" style="${on?'':'background:var(--dim)'}"></span>
-      <span class="av" style="${on?'':'filter:grayscale(.7);opacity:.75'}">${esc((p.username||"؟").trim().charAt(0))}</span>
-      <div><div>${esc(p.username||"لاعب")} ${p.is_premium?PREM:""}</div><div class="cd">${esc(p.player_code||"")}</div></div>
-      <span style="flex:1"></span>${status}</div>`;
-  };
-  const bind=()=>box.querySelectorAll(".orow").forEach(el=>el.onclick=()=>openPlayer(el.dataset.id));
-  const showOnline=()=>{ box.innerHTML=list.length?list.map(row).join(""):`<div class="empty">لا أحد متصل الآن.</div>`; bind(); };
+  const showOnline=()=>{ box.innerHTML=list.length?list.map(p=>playerRow(p)).join(""):`<div class="empty">لا أحد متصل الآن.</div>`; bindRows(box); };
   showOnline();
   let t=null;
   q.addEventListener("input",()=>{
@@ -502,12 +507,40 @@ async function openOnline(){
     // search hits EVERY player; offline hits show "last seen" instead of activity
     t=setTimeout(async()=>{
       try{ const r=await rpc("admin_search_players",{p_q:term,p_limit:25});
-        box.innerHTML=r.length?r.map(row).join(""):`<div class="empty">لا نتائج لـ «${esc(term)}»</div>`; bind();
+        box.innerHTML=r.length?r.map(p=>playerRow(p)).join(""):`<div class="empty">لا نتائج لـ «${esc(term)}»</div>`; bindRows(box);
       }catch(e){ box.innerHTML=`<div class="empty">تعذّر البحث</div>`; }
     },220);
   });
   setTimeout(()=>q.focus(),60);
 }
+
+// Generic list modal (today's signups / Premium) with a local filter.
+async function openPlayerListModal(title, loader, emptyMsg, meta){
+  let list=[]; try{ list=await loader(); }catch(e){ toast("تعذّر التحميل","err"); return; }
+  const ov=showModal(`${title} · ${fmt(list.length)} لاعب`,
+    `<div style="margin-bottom:12px"><input class="fin" id="plq" placeholder="تصفية بالاسم أو الرمز…" autocomplete="off"></div>
+     <div class="olist" id="pllist"></div>`);
+  const box=ov.querySelector("#pllist"), q=ov.querySelector("#plq");
+  const draw=rows=>{ box.innerHTML=rows.length?rows.map(p=>playerRow(p,meta)).join(""):`<div class="empty">${emptyMsg}</div>`; bindRows(box); };
+  draw(list);
+  q.addEventListener("input",()=>{
+    const t=q.value.trim().toLowerCase();
+    draw(!t?list:list.filter(p=>(p.username||"").toLowerCase().includes(t)||(p.player_code||"").toLowerCase().includes(t)));
+  });
+  setTimeout(()=>q.focus(),60);
+}
+const openNewPlayers=()=>openPlayerListModal("✨ تسجيلات اليوم",
+  ()=>rpc("admin_new_players",{p_limit:100}), "لا تسجيلات اليوم بعد.",
+  p=>`<span class="ac" style="color:var(--dim)">انضم ${timeAgo(p.created_at)}</span>`);
+const openPremiumPlayers=()=>openPlayerListModal("👑 مشتركو Premium",
+  ()=>rpc("admin_premium_players",{p_limit:200}), "لا مشتركين حالياً.",
+  p=>{
+    if(!p.premium_until) return `<span class="ac" style="color:var(--gold-l)">👑 بلا انتهاء</span>`;
+    const d=Math.ceil((new Date(p.premium_until)-Date.now())/86400000);
+    return d>0
+      ? `<span class="ac" style="color:${d<=3?'var(--red)':'var(--gold-l)'}">ينتهي بعد ${fmt(d)} يوم</span>`
+      : `<span class="ac" style="color:var(--red)">منتهٍ</span>`;
+  });
 
 // ---- series / heat / categories / levels ----
 const PERIODS=[{l:"يوم",d:1},{l:"أسبوع",d:7},{l:"شهر",d:30},{l:"3 أشهر",d:90},{l:"سنة",d:365}];
