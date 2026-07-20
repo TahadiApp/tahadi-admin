@@ -99,6 +99,11 @@
   .fi{display:flex;align-items:center;gap:11px;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.05);font-size:12.5px;}
   .fi .ic{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;font-size:14px;flex:none;}
   .fi .t{color:var(--dim);font-size:11px;margin-inline-start:auto;white-space:nowrap;} .fi .fx{color:var(--muted);} .fi .fx b{color:var(--text);}
+  .fi.tap{cursor:pointer;border-radius:9px;padding-inline:6px;transition:background .15s;} .fi.tap:hover{background:rgba(255,255,255,.06);}
+  .ptbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px;}
+  .ptbl th{color:var(--dim);font-weight:700;font-size:11px;text-align:start;padding:5px 7px;border-bottom:1px solid var(--line2);}
+  .ptbl td{padding:6px 7px;border-bottom:1px solid rgba(255,255,255,.05);}
+  .ptbl tr.win td{background:rgba(52,211,153,.08);}
   .heat{display:grid;grid-template-columns:repeat(24,1fr);gap:3px;} .heat .c{aspect-ratio:1;border-radius:3px;} .heat-lgd{font-size:11px;color:var(--dim);margin-top:9px;}
   .rep{display:flex;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px solid rgba(255,255,255,.05);font-size:12.5px;}
   .rep .q{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} .rep .cat{color:var(--dim);font-size:11px;flex:none;}
@@ -603,11 +608,67 @@ async function loadLevels(){
   $("#levels").innerHTML=d.map((l,i)=>{const w=Math.max(2,Math.round(l.players/max*100));
     return `<div class="bar"><div class="br"><span>🎖️ ${esc(l.level)} <span style="color:var(--dim);font-size:10.5px">(${fmt(l.min_xp)}+ XP)</span></span><b class="num">${fmt(l.players)}</b></div><div class="tr"><div class="fl" style="width:${w}%;background:${cols[i%cols.length]}"></div></div></div>`;}).join("");
 }
+let eventsCache=[];
+const EV_ICON={signup:["✨","rgba(52,211,153,.2)"],match:["🏆","rgba(96,165,250,.2)"],purchase:["🛒","rgba(251,191,36,.2)"],report:["🚩","rgba(248,113,113,.2)"]};
 async function loadEvents(){
-  const d=await rpc("admin_recent_events",{p_limit:14});
-  const ic={signup:["✨","rgba(52,211,153,.2)"],match:["🏆","rgba(96,165,250,.2)"],purchase:["🛒","rgba(251,191,36,.2)"],report:["🚩","rgba(248,113,113,.2)"]};
-  $("#events").innerHTML=d.length?d.map(e=>{const[emoji,bg]=ic[e.type]||["•","rgba(255,255,255,.1)"];
-    return `<div class="fi"><span class="ic" style="background:${bg}">${emoji}</span><span class="fx">${e.label}</span><span class="t">${timeAgo(e.ts)}</span></div>`;}).join(""):`<div class="empty">لا أحداث بعد</div>`;
+  eventsCache=await rpc("admin_recent_events",{p_limit:14});
+  $("#events").innerHTML=eventsCache.length?eventsCache.map((e,i)=>{const[emoji,bg]=EV_ICON[e.type]||["•","rgba(255,255,255,.1)"];
+    return `<div class="fi tap" data-i="${i}"><span class="ic" style="background:${bg}">${emoji}</span><span class="fx">${e.label}</span><span class="t">${timeAgo(e.ts)}</span></div>`;}).join(""):`<div class="empty">لا أحداث بعد</div>`;
+  $("#events").querySelectorAll(".fi.tap").forEach(el=>el.onclick=()=>openEvent(eventsCache[+el.dataset.i]));
+}
+
+// ---- live-event details popup ----
+function openEvent(e){
+  if(!e) return;
+  const d=e.detail||{}, [emoji]=EV_ICON[e.type]||["•"];
+  const who=(name,code)=>name?`${esc(name)} <span style="color:var(--dim);font-size:11px">${esc(code||"")}</span>`:"—";
+  const when=t=>t?`${timeAgo(t)} <span style="color:var(--dim);font-size:11px">${new Date(t).toLocaleString("ar-EG")}</span>`:"—";
+  let body="", title=e.label;
+  if(e.type==="signup"){
+    body=`<div class="kv">
+      ${kv("اللاعب",who(d.player,d.code))}
+      ${kv("المستوى",esc(d.level||"—"))}
+      ${kv("الخبرة",fmt(d.xp||0)+" XP")}
+      ${kv("العملات",fmt(d.coins||0)+" 🪙")}
+      ${kv("الاشتراك",d.premium?'<span style="color:var(--gold);font-weight:800">Premium 👑</span>':"مجاني")}
+      ${kv("تاريخ الانضمام",when(d.at))}
+    </div>`;
+  }else if(e.type==="match"){
+    const ps=d.players||[];
+    const rows=ps.map(p=>`<tr class="${p.winner?"win":""}">
+        <td>${p.winner?"🏆 ":""}${esc(p.name||"—")} <span style="color:var(--dim);font-size:11px">${esc(p.code||"")}</span></td>
+        <td style="color:var(--green);font-weight:800">${p.correct??0}</td>
+        <td style="color:var(--red);font-weight:800">${p.wrong??0}</td>
+        <td>${fmt(p.xp||0)}</td></tr>`).join("");
+    body=`<div class="kv">
+      ${kv("التصنيف",`${d.icon||""} ${esc(d.category||"—")}`)}
+      ${kv("الفائز",d.winner?who(d.winner,d.winner_code):"لا فائز")}
+      ${kv("انتهت",when(d.at))}
+      ${kv("عدد اللاعبين",String(ps.length))}
+    </div>${ps.length?`<div class="lbl">نتائج اللاعبين</div>
+      <table class="ptbl"><tr><th>اللاعب</th><th>صحيح</th><th>خطأ</th><th>XP</th></tr>${rows}</table>`:""}`;
+  }else if(e.type==="purchase"){
+    body=`<div class="kv">
+      ${kv("المشتري",who(d.player,d.code))}
+      ${kv("المنتج",`${d.item_icon||""} ${esc(d.item||"—")}`)}
+      ${kv("النوع",esc(d.item_type||"—"))}
+      ${kv("السعر",d.price_coins?fmt(d.price_coins)+" 🪙":(d.price_real?d.price_real+" ر.س":"—"))}
+      ${kv("وقت الشراء",when(d.at))}
+    </div>`;
+  }else if(e.type==="report"){
+    const ST={open:"مفتوح",reviewed:"مُعالَج",dismissed:"مرفوض"};
+    body=`<div class="kv">
+      ${kv("المُبلِّغ",who(d.reporter,d.code))}
+      ${kv("سبب البلاغ",`<span style="color:var(--red)">${esc(d.reason||"—")}</span>`)}
+      ${kv("الحالة",ST[d.status]||esc(d.status||"—"))}
+      ${kv("التصنيف",`${d.icon||""} ${esc(d.category||"—")}`)}
+      ${kv("وقت البلاغ",when(d.at))}
+    </div>${d.question?`<div class="lbl">نص السؤال <span style="color:var(--dim)">#${d.question_id}</span></div>
+      <div class="val" style="line-height:1.7">${esc(d.question)}</div>`:""}`;
+  }else{
+    body=`<div class="kv">${kv("الوقت",when(e.ts))}</div>`;
+  }
+  showModal(`${emoji} ${esc(title)}`, body, "sm");
 }
 
 // ---- reports ----
