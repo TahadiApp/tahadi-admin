@@ -321,14 +321,52 @@
       <!-- ================= BROADCAST ================= -->
       <section class="view" id="v-broadcast">
         <div class="grid">
+          <div class="card w12">
+            <div class="hd"><h3>🎛️ التحكم بالإشعارات (Push)</h3><span class="pill" id="pushStatus">…</span></div>
+            <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;">
+              <label class="switch"><input type="checkbox" id="pushEnabled"><span class="track"></span><span style="font-size:13px;font-weight:700">تفعيل الإشعارات الخارجية</span></label>
+              <label class="switch"><input type="checkbox" id="pushAutoCat"><span class="track"></span><span style="font-size:13px;font-weight:700">بث تلقائي عند تصنيف جديد</span></label>
+            </div>
+            <div class="lbl" style="margin-top:14px;">أنواع الإشعارات التي تُرسَل كـ Push (المُطفأ يبقى داخل الجرس فقط)</div>
+            <div style="display:flex;flex-wrap:wrap;gap:20px;">
+              <label class="switch"><input type="checkbox" id="pt_direct_message"><span class="track"></span><span style="font-size:13px;">💬 الرسائل الخاصة</span></label>
+              <label class="switch"><input type="checkbox" id="pt_friends"><span class="track"></span><span style="font-size:13px;">🤝 الصداقة</span></label>
+              <label class="switch"><input type="checkbox" id="pt_room_invite"><span class="track"></span><span style="font-size:13px;">⚔️ التحديات والدعوات</span></label>
+              <label class="switch"><input type="checkbox" id="pt_achievement"><span class="track"></span><span style="font-size:13px;">🏅 الإنجازات</span></label>
+              <label class="switch"><input type="checkbox" id="pt_streak_warning"><span class="track"></span><span style="font-size:13px;">🔥 تذكير السلسلة</span></label>
+            </div>
+            <div class="row" style="margin-top:14px;"><button class="btn primary" id="pushSave">💾 حفظ الإعدادات</button></div>
+            <div class="fhint">البثّ الجماعي (تحت) غير متأثر بمفاتيح الأنواع — يُرسَل دائماً ما دام «تفعيل الإشعارات الخارجية» مُشغّلاً.</div>
+          </div>
           <div class="card w5">
-            <div class="hd"><h3>🔔 إشعار جماعي</h3><span class="pill">يصل كل اللاعبين</span></div>
-            <label class="flbl">العنوان</label>
+            <div class="hd"><h3>🔔 إشعار جماعي</h3><span class="pill">Push + داخل التطبيق</span></div>
+            <label class="flbl">قوالب سريعة</label>
+            <div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:2px;">
+              <button type="button" class="btn sm" onclick="bcPreset('maintenance')">🛠️ صيانة</button>
+              <button type="button" class="btn sm" onclick="bcPreset('invite')">🎮 دعوة لتجربة</button>
+              <button type="button" class="btn sm" onclick="bcPreset('discount')">🏷️ خصم بالمتجر</button>
+              <button type="button" class="btn sm" onclick="bcPreset('category')">🗂️ تصنيف جديد</button>
+              <button type="button" class="btn sm" onclick="bcPreset('tournament')">🏆 بطولة</button>
+              <button type="button" class="btn sm" onclick="bcPreset('clear')">💬 فارغ</button>
+            </div>
+            <label class="flbl" style="margin-top:8px;">العنوان</label>
             <input class="fin" id="bcTitle" placeholder="مثال: صدر تحديث جديد!">
             <label class="flbl" style="margin-top:10px;">النص (اختياري)</label>
             <textarea class="fin" id="bcBody" placeholder="جرّبوا الميزات الجديدة الآن."></textarea>
-            <div class="row" style="margin-top:12px;"><button class="btn gold" id="bcSend">🔔 إرسال للجميع</button></div>
-            <div class="fhint">يُرسَل إشعاراً داخل التطبيق لكل لاعب نشط (غير محظور).</div>
+            <div style="display:flex;gap:10px;margin-top:10px;">
+              <div style="flex:1"><label class="flbl">الفئة المستهدفة</label>
+                <select class="fin" id="bcSeg">
+                  <option value="all">كل اللاعبين</option>
+                  <option value="active">النشطون (آخر ١٤ يوم)</option>
+                  <option value="premium">مشتركو Premium</option>
+                </select>
+              </div>
+              <div style="flex:1"><label class="flbl">وجهة النقر (اختياري)</label>
+                <input class="fin" id="bcRoute" placeholder="/shop">
+              </div>
+            </div>
+            <div class="row" style="margin-top:12px;"><button class="btn gold" id="bcSend">🔔 إرسال</button></div>
+            <div class="fhint">يصل إشعاراً خارج التطبيق (Push) + داخل الجرس. الوجهات المدعومة: /shop، /achievements، /missions، /tournaments، أو اتركها فارغة لإشعار عادي.</div>
           </div>
           <div class="card w7">
             <div class="hd"><h3>📰 إعلان الشاشة الرئيسية</h3><span class="pill">نافذة منبثقة</span></div>
@@ -420,6 +458,7 @@ $("#chatRefresh").addEventListener("click",()=>loadChat());
 $("#maintSave").addEventListener("click",saveMaintenance);
 $("#mcSave").addEventListener("click",saveMatch);
 $("#bcSend").addEventListener("click",broadcast);
+$("#pushSave").addEventListener("click",savePushSettings);
 $("#anCreate").addEventListener("click",createAnnouncement);
 
 // ---- view switching ----
@@ -431,7 +470,7 @@ function go(v){
   $(".body").scrollTop=0;
   if(v==="livechat") loadChat();
   if(v==="control") loadControl();
-  if(v==="broadcast") loadAnnouncements();
+  if(v==="broadcast"){ loadPushSettings(); loadAnnouncements(); }
 }
 nav.addEventListener("click",e=>{const a=e.target.closest("a"); if(a) go(a.dataset.v);});
 
@@ -955,12 +994,56 @@ async function setCat(id,state){
 }
 
 // ---- broadcast + announcements ----
+const BC_SEG_LABEL={all:"كل اللاعبين",active:"النشطون (آخر ١٤ يوم)",premium:"مشتركو Premium"};
+const BC_PRESETS={
+  maintenance:{t:"🛠️ صيانة مجدولة",b:"سيتوقف التطبيق مؤقتاً للصيانة قريباً. نعتذر عن الإزعاج ونعود بأسرع وقت.",r:"",s:"all"},
+  invite:{t:"🎮 جرّبها الآن!",b:"أضفنا ما يستحق التجربة — ادخل واكتشفه بنفسك.",r:"",s:"active"},
+  discount:{t:"🏷️ خصومات المتجر!",b:"عروض لفترة محدودة داخل المتجر — لا تفوّتها.",r:"/shop",s:"all"},
+  category:{t:"🗂️ تصنيف جديد!",b:"أضفنا تصنيف أسئلة جديداً — جرّبه الآن.",r:"",s:"all"},
+  tournament:{t:"🏆 بطولة جديدة!",b:"انطلقت بطولة جديدة — شارك وتنافس على القمة.",r:"/tournaments",s:"all"},
+  clear:{t:"",b:"",r:"",s:"all"},
+};
+function bcPreset(k){
+  const p=BC_PRESETS[k]; if(!p) return;
+  $("#bcTitle").value=p.t; $("#bcBody").value=p.b; $("#bcRoute").value=p.r; $("#bcSeg").value=p.s;
+}
 async function broadcast(){
-  const title=$("#bcTitle").value.trim(), body=$("#bcBody").value.trim();
+  const title=$("#bcTitle").value.trim(), body=$("#bcBody").value.trim(),
+        seg=$("#bcSeg").value||"all", route=$("#bcRoute").value.trim();
   if(!title){ toast("اكتب عنواناً","err"); return; }
-  if(!await confirmDialog("إشعار جماعي",`سيصل هذا الإشعار إلى <b>كل اللاعبين النشطين</b>.<br>«${esc(title)}»<br>هل تريد الإرسال؟`)) return;
-  await act(async()=>{ const n=await rpc("admin_broadcast_notification",{p_title:title,p_body:body||null});
-    $("#bcTitle").value=""; $("#bcBody").value=""; toast("أُرسل إلى "+fmt(n)+" لاعب","ok"); });
+  const dest=route?`<br>عند النقر يفتح: <b>${esc(route)}</b>`:"";
+  if(!await confirmDialog("إشعار جماعي",`سيصل إلى <b>${BC_SEG_LABEL[seg]||seg}</b> كإشعار خارج التطبيق + داخل الجرس.<br>«${esc(title)}»${dest}<br>هل تريد الإرسال؟`)) return;
+  await act(async()=>{ const n=await rpc("admin_broadcast",{p_title:title,p_body:body||null,p_route:route||null,p_segment:seg});
+    $("#bcTitle").value=""; $("#bcBody").value=""; $("#bcRoute").value=""; toast("أُرسل إلى "+fmt(n)+" لاعب","ok"); });
+}
+// ---- push notification settings (master + per-type + auto-category) ----
+async function loadPushSettings(){
+  try{
+    const s=await rpc("admin_push_settings"); const muted=s.muted_types||[];
+    $("#pushEnabled").checked=s.enabled===true;
+    $("#pushAutoCat").checked=s.auto_category!==false;
+    $("#pt_direct_message").checked=!muted.includes("direct_message");
+    $("#pt_friends").checked=!muted.includes("friend_request");
+    $("#pt_room_invite").checked=!muted.includes("room_invite");
+    $("#pt_achievement").checked=!muted.includes("achievement");
+    $("#pt_streak_warning").checked=!muted.includes("streak_warning");
+    const pill=$("#pushStatus");
+    if(s.configured){ pill.textContent="مُهيّأ ✓"; pill.className="pill g"; }
+    else{ pill.textContent="غير مُهيّأ — راجع دليل الإعداد"; pill.className="pill"; }
+  }catch(e){ const pill=$("#pushStatus"); if(pill){ pill.textContent="تعذّر التحميل"; pill.className="pill"; } }
+}
+async function savePushSettings(){
+  const muted=[];
+  if(!$("#pt_direct_message").checked) muted.push("direct_message");
+  if(!$("#pt_friends").checked) muted.push("friend_request","friend_accepted");
+  if(!$("#pt_room_invite").checked) muted.push("room_invite");
+  if(!$("#pt_achievement").checked) muted.push("achievement");
+  if(!$("#pt_streak_warning").checked) muted.push("streak_warning");
+  await act(()=>rpc("admin_set_push_settings",{
+    p_enabled:$("#pushEnabled").checked,
+    p_muted_types:muted,
+    p_auto_category:$("#pushAutoCat").checked,
+  }),"حُفظت إعدادات الإشعارات",loadPushSettings);
 }
 async function loadAnnouncements(){
   try{
