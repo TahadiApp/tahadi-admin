@@ -83,7 +83,9 @@
   /* ---- Shell: fixed header + nav, only .body scrolls ---- */
   /* ===== NEW SHELL — floating icon rail on the right (matches Figma) ===== */
   .shell{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
-  .shell.v2{flex-direction:row-reverse;padding:18px;gap:16px;background:transparent;}
+  /* dir=rtl already lays rows right-to-left, so plain `row` puts the rail
+     (the first child) on the RIGHT edge. */
+  .shell.v2{flex-direction:row;padding:18px;gap:16px;background:transparent;}
   .shell.v2 .main{flex:1;min-width:0;display:flex;flex-direction:column;gap:16px;overflow:hidden;}
   /* Floating rail */
   .rail{width:62px;flex:none;display:flex;flex-direction:column;align-items:center;gap:9px;
