@@ -331,6 +331,7 @@
     <a data-v="control" title="التحكم والصيانة">🎚️</a>
     <a data-v="broadcast" title="البث">📣</a>
     <a data-v="staff" title="المشرفون">🛡️</a>
+    <a data-v="security" title="رصد النشاطات المشبوهة">🕵️<span class="cnt hidden" id="susCnt">0</span></a>
     <div class="sp"></div>
     <div class="me" id="signout" title="تسجيل الخروج">👑</div>
   </nav>
@@ -576,6 +577,34 @@
           </div>
         </div>
       </section>
+
+      <!-- ================= SECURITY / SUSPICIOUS ACTIVITY ================= -->
+      <section class="view" id="v-security">
+        <div class="grid">
+          <div class="w12">
+            <div class="card">
+              <div class="hd">
+                <h3>🕵️ رصد النشاطات المشبوهة</h3>
+                <div class="row">
+                  <select class="fin" id="susDays" style="width:150px;padding:7px 10px;">
+                    <option value="1">آخر 24 ساعة</option>
+                    <option value="7">آخر 7 أيام</option>
+                    <option value="30" selected>آخر 30 يوماً</option>
+                    <option value="90">آخر 90 يوماً</option>
+                  </select>
+                  <button class="btn sm" id="susRefresh">↻ فحص الآن</button>
+                </div>
+              </div>
+              <div class="fhint" style="margin-bottom:12px">
+                النظام <b>يرصد ويشرح فقط</b> — لا يحظر ولا يعاقب تلقائياً. القرار النهائي لك بعد مراجعة كل حالة.
+                اضغط أي حالة لفتح ملف اللاعب.
+              </div>
+              <div id="susSummary" class="grid" style="margin-bottom:14px"></div>
+              <div id="susList"><div class="empty">اضغط «فحص الآن»</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
 </div>
@@ -608,7 +637,7 @@ const MODE_AR={online:"⚔️ المباشر",friends:"👫 الأصدقاء",ro
 const ACT_AR={solo:"🎯 الفردي",online:"⚔️ المباشر",friends:"👫 الأصدقاء",rooms:"👥 الغرف",room:"👥 الغرف",home:"🏠 الرئيسية",chat:"💬 الدردشة",leaderboard:"🏆 الترتيب",stats:"📊 الإحصائيات",profile:"👤 الحساب",shop:"🛒 المتجر",other:"• أخرى"};
 const ACT_COLOR={solo:"#60A5FA",online:"#A855F7",friends:"#34D399",rooms:"#F472B6",room:"#F472B6",home:"#867AA6",shop:"#FB923C",other:"#867AA6"};
 const MODES=[["online","⚔️ التحدي المباشر"],["solo","🎯 التحدي الفردي"],["friends","👫 تحدي الأصدقاء"],["rooms","👥 الغرف الجماعية"]];
-const SUB={overview:["نظرة عامة","كل مؤشرات التطبيق في مكان واحد"],players:["اللاعبون","بحث وتحكّم في الحسابات"],livechat:["الدردشة الحية","إشراف فوري على المحادثة"],content:["المحتوى","التصنيفات والبلاغات"],control:["التحكم والصيانة","الصيانة والتصنيفات والأوضاع"],broadcast:["البث","إشعارات وإعلانات"],staff:["المشرفون","الصلاحيات وسجل الإجراءات"]};
+const SUB={overview:["نظرة عامة","كل مؤشرات التطبيق في مكان واحد"],players:["اللاعبون","بحث وتحكّم في الحسابات"],livechat:["الدردشة الحية","إشراف فوري على المحادثة"],content:["المحتوى","التصنيفات والبلاغات"],control:["التحكم والصيانة","الصيانة والتصنيفات والأوضاع"],broadcast:["البث","إشعارات وإعلانات"],staff:["المشرفون","الصلاحيات وسجل الإجراءات"],security:["رصد النشاطات المشبوهة","كشف آلي للغش والشذوذ"]};
 const fmt=n=>(n==null?"—":Number(n).toLocaleString("en-US"));
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const kv=(k,v)=>`<div><div class="k">${k}</div><div class="val">${v}</div></div>`;
@@ -671,6 +700,8 @@ $("#stqBtn").addEventListener("click",stSearch);
 $("#stq").addEventListener("keydown",e=>{if(e.key==="Enter") stSearch();});
 $("#auditRefresh").addEventListener("click",loadAudit);
 $("#auditActor").addEventListener("change",loadAudit);
+$("#susRefresh").addEventListener("click",loadSuspicious);
+$("#susDays").addEventListener("change",loadSuspicious);
 
 // ---- view switching ----
 const nav=$("#nav");
@@ -684,6 +715,7 @@ function go(v){
   if(v==="control") loadControl();
   if(v==="broadcast"){ loadPushSettings(); loadAnnouncements(); }
   if(v==="staff"){ loadStaff(); loadAudit(); }
+  if(v==="security") loadSuspicious();
 }
 nav.addEventListener("click",e=>{const a=e.target.closest("a"); if(a) go(a.dataset.v);});
 
@@ -699,7 +731,7 @@ async function enter(){
   $("#login").classList.add("hidden"); $("#dash").classList.remove("hidden");
   renderSnapshot(snap);
   renderPeriods(); renderRepFilter();
-  await Promise.all([loadSeries(),loadHeat(),loadCategories(),loadLevels(),loadReports(),loadEvents(),loadBreakdown(),loadFees(),loadTops("coins")]);
+  await Promise.all([loadSeries(),loadHeat(),loadCategories(),loadLevels(),loadReports(),loadEvents(),loadBreakdown(),loadFees(),loadTops("coins"),susBadge()]);
   startRealtime(); startLoop();
 }
 
@@ -1403,6 +1435,69 @@ async function loadTops(kind){
       <div style="font-weight:900;color:var(--gold);font-size:12px;white-space:nowrap;">${valOf(p)}</div></div>`;
   }).join("");
   box.innerHTML=`<div class="podium">${pod}</div>${list}`;
+}
+
+// ---- suspicious activity detection (2026-07-25) ----
+// The server detects and explains; this only presents. Nothing here bans anyone.
+const SUS_META={
+  xp_spike:{ic:"⚡",c:"var(--red)"},
+  coins_unexplained:{ic:"🪙",c:"var(--red)"},
+  help_not_owned:{ic:"🧰",c:"var(--red)"},
+  match_flood:{ic:"🌊",c:"var(--orange)"},
+  superhuman_speed:{ic:"⏱️",c:"var(--amber)"},
+  frequent_abandon:{ic:"🚪",c:"var(--amber)"},
+};
+const SEV_AR={critical:{t:"حرجة",c:"var(--red)"},high:{t:"عالية",c:"var(--orange)"},medium:{t:"تحتاج تحقق",c:"var(--amber)"}};
+// Rail badge — a quiet heads-up that findings exist, without opening the tab.
+async function susBadge(){
+  try{
+    const rows=await rpc("admin_suspicious_activity",{p_days:30});
+    const n=rows?rows.length:0, b=$("#susCnt");
+    if(b){ b.textContent=n; b.classList.toggle("hidden",n===0); }
+  }catch(e){}
+}
+async function loadSuspicious(){
+  const box=$("#susList"), sum=$("#susSummary");
+  const days=parseInt($("#susDays").value||"30",10);
+  box.innerHTML='<div class="empty">جارٍ الفحص…</div>'; sum.innerHTML="";
+  let rows; try{ rows=await rpc("admin_suspicious_activity",{p_days:days}); }
+  catch(e){ box.innerHTML='<div class="empty">تعذّر الفحص</div>'; return; }
+  const n=rows?rows.length:0;
+  const badge=$("#susCnt");
+  if(badge){ badge.textContent=n; badge.classList.toggle("hidden",n===0); }
+  // severity summary
+  const by={critical:0,high:0,medium:0};
+  (rows||[]).forEach(r=>{by[r.severity]=(by[r.severity]||0)+1;});
+  sum.innerHTML=["critical","high","medium"].map(s=>
+    `<div class="w4"><div class="stat" style="border-color:color-mix(in srgb,${SEV_AR[s].c} 40%,transparent)">
+      <div class="v num" style="color:${SEV_AR[s].c}">${by[s]||0}</div>
+      <div class="l">${s==="critical"?"🔴":s==="high"?"🟠":"🟡"} ${SEV_AR[s].t}</div></div></div>`).join("");
+  if(!n){ box.innerHTML='<div class="empty big">✅ لا نشاطات مشبوهة في هذه الفترة</div>'; return; }
+  box.innerHTML=rows.map(r=>{
+    const m=SUS_META[r.kind]||{ic:"⚠️",c:"var(--muted)"}, sv=SEV_AR[r.severity]||SEV_AR.medium;
+    const rep=r.occurrences>1?`<span class="badge" style="background:color-mix(in srgb,${m.c} 18%,transparent);color:${m.c}">تكرر ${fmt(r.occurrences)} مرة</span>`:"";
+    const banned=r.is_banned?'<span class="badge r">محظور</span>':"";
+    const guest=r.is_guest?'<span class="badge">🎭 ضيف</span>':"";
+    return `<div onclick="openPlayer('${r.player_id}')" style="cursor:pointer;display:flex;gap:13px;align-items:flex-start;
+        padding:14px;border-radius:16px;background:var(--s1);margin-bottom:9px;
+        border:1px solid color-mix(in srgb,${sv.c} 32%,transparent);border-right:4px solid ${sv.c}">
+      <div style="font-size:22px;line-height:1">${m.ic}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+          <b style="font-size:13.5px">${esc(r.title)}</b>
+          <span class="badge" style="background:color-mix(in srgb,${sv.c} 18%,transparent);color:${sv.c}">${sv.t}</span>
+          ${rep}
+        </div>
+        <div style="font-size:12.5px;color:var(--muted);line-height:1.7">${esc(r.evidence)}</div>
+        <div style="font-size:11px;color:var(--dim);margin-top:6px">
+          👤 <b style="color:var(--text)">${esc(r.username)}</b> ${esc(r.player_code||"")} ${guest} ${banned}
+          · 🪙 ${fmt(r.coins)} · ⚡ ${fmt(r.xp)} XP
+          ${r.last_at?" · 🕓 آخر حدوث "+timeAgo(r.last_at):""}
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--dim);white-space:nowrap">اضغط للملف ←</div>
+    </div>`;
+  }).join("");
 }
 
 // ---- staff management + audit trail (2026-07-25) ----
