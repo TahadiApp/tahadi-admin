@@ -1347,26 +1347,59 @@ async function loadTops(kind){
     if(kind==="paid") return "💵 $"+((p.usd_cents||0)/100).toFixed(2);
     return "🧰 "+fmt(p.value);
   };
-  // ---- Podium for the top 3, list for the rest (matches the Figma design) ----
-  const MED=[{m:"🥇",c:"var(--gold)",h:118},{m:"🥈",c:"#C7C9D9",h:88},{m:"🥉",c:"var(--orange)",h:68}];
+  const RANK=[{m:"🥇",c:"var(--gold)"},{m:"🥈",c:"#C7C9D9"},{m:"🥉",c:"var(--orange)"}];
+  const guestB=p=>p.is_guest?' <span class="badge">🎭 ضيف</span>':"";
+
+  // ---- HELPS: a full detail table — every tool and its quantity per player.
+  // (Details are the whole point here, so no podium: it hides them.) ----
+  if(kind==="helps"){
+    // Every tool that appears anywhere, so the table has stable columns.
+    const cols=[]; const seen=new Set();
+    rows.forEach(p=>(p.details||[]).forEach(d=>{ if(!seen.has(d.name)){seen.add(d.name); cols.push({name:d.name,icon:d.icon||"🧩"});} }));
+    const totals={}; cols.forEach(c=>totals[c.name]=0);
+    rows.forEach(p=>(p.details||[]).forEach(d=>{ totals[d.name]=(totals[d.name]||0)+Number(d.quantity||0); }));
+    const head=`<tr>
+      <th style="text-align:right;width:34px"></th>
+      <th style="text-align:right">اللاعب</th>
+      ${cols.map(c=>`<th style="text-align:center;white-space:nowrap">${c.icon} ${esc(c.name)}</th>`).join("")}
+      <th style="text-align:center">الإجمالي</th></tr>`;
+    const body=rows.map((p,i)=>{
+      const q={}; (p.details||[]).forEach(d=>q[d.name]=Number(d.quantity||0));
+      const r=RANK[i];
+      return `<tr onclick="openPlayer('${p.id}')" style="cursor:pointer">
+        <td style="text-align:center;font-weight:900;color:${r?r.c:"var(--dim)"}">${r?r.m:"#"+(i+1)}</td>
+        <td><b>${esc(p.username)}</b>${guestB(p)} <span style="color:var(--dim);font-size:11px">${esc(p.player_code||"")}</span></td>
+        ${cols.map(c=>{const v=q[c.name]||0;
+          return `<td class="num" style="text-align:center;font-weight:${v?800:400};color:${v?"var(--text)":"var(--dim)"}">${v||"—"}</td>`;}).join("")}
+        <td class="num" style="text-align:center;font-weight:900;color:var(--gold)">${fmt(p.value)}</td></tr>`;
+    }).join("");
+    const foot=`<tr style="border-top:2px solid var(--line2)">
+      <td></td><td style="color:var(--muted);font-weight:800">مجموع الكل</td>
+      ${cols.map(c=>`<td class="num" style="text-align:center;font-weight:900;color:var(--primary-l)">${fmt(totals[c.name])}</td>`).join("")}
+      <td class="num" style="text-align:center;font-weight:900;color:var(--gold)">${fmt(rows.reduce((s,p)=>s+Number(p.value||0),0))}</td></tr>`;
+    box.innerHTML=`<div style="overflow-x:auto"><table class="ptbl" style="width:100%;border-collapse:collapse;font-size:12.5px">
+      <thead style="color:var(--muted);font-size:11.5px">${head}</thead><tbody>${body}${foot}</tbody></table></div>`;
+    return;
+  }
+
+  // ---- Podium for the top 3 + list for the rest (coins / xp / paid) ----
   const top=rows.slice(0,3), rest=rows.slice(3);
-  const order=[1,0,2];  // 2nd, 1st, 3rd — tallest in the middle
-  const pod=order.filter(i=>top[i]).map(i=>{
-    const p=top[i], s=MED[i];
+  const H=[118,88,68];
+  const pod=[1,0,2].filter(i=>top[i]).map(i=>{
+    const p=top[i], s=RANK[i];
     return `<div class="pod" onclick="openPlayer('${p.id}')" style="cursor:pointer">
       <div class="av" style="border-color:${s.c};background:color-mix(in srgb,${s.c} 18%,transparent);box-shadow:0 0 16px color-mix(in srgb,${s.c} 45%,transparent)">${esc((p.username||"؟").trim().charAt(0))}</div>
       <div class="nm">${esc(p.username)}</div>
-      <div class="blk" style="height:${s.h}px;border-color:color-mix(in srgb,${s.c} 50%,transparent);
+      <div class="blk" style="height:${H[i]}px;border-color:color-mix(in srgb,${s.c} 50%,transparent);
         background:linear-gradient(180deg,color-mix(in srgb,${s.c} 45%,transparent),color-mix(in srgb,${s.c} 6%,transparent))">
-        <div class="md">${s.m}</div><div class="vv num" style="color:${s.c}">${valOf(p)}</div></div></div>`;
+        <div class="md">${s.m}</div><div class="vv num" style="color:${s.c}">${valOf(p)}</div>
+        ${kind==="paid"?`<div style="font-size:9.5px;color:var(--muted)">${fmt(p.coins_bought)} 🪙 · ${p.purchases} عملية</div>`:""}</div></div>`;
   }).join("");
   const list=rest.map((p,i)=>{
-    const details=(kind==="helps"&&p.details)?'<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+p.details.map(d=>`${d.icon||"🧩"} ${esc(d.name)} ×${d.quantity}`).join(" · ")+"</div>":"";
-    const guest=p.is_guest?' <span class="badge">🎭 ضيف</span>':"";
     const extra=kind==="paid"?` <span style="color:var(--dim);font-size:11px">${fmt(p.coins_bought)} 🪙 · ${p.purchases} عملية</span>`:"";
     return `<div onclick="openPlayer('${p.id}')" style="cursor:pointer;display:flex;align-items:center;gap:11px;padding:8px 11px;border-radius:12px;background:var(--s1);margin-top:5px;">
       <b style="width:28px;text-align:center;font-size:11px;color:var(--dim)">#${i+4}</b>
-      <div style="flex:1"><b style="font-size:12.5px">${esc(p.username)}</b>${guest} <span style="color:var(--dim);font-size:11px;">${esc(p.player_code||"")}</span>${details}${extra}</div>
+      <div style="flex:1"><b style="font-size:12.5px">${esc(p.username)}</b>${guestB(p)} <span style="color:var(--dim);font-size:11px;">${esc(p.player_code||"")}</span>${extra}</div>
       <div style="font-weight:900;color:var(--gold);font-size:12px;white-space:nowrap;">${valOf(p)}</div></div>`;
   }).join("");
   box.innerHTML=`<div class="podium">${pod}</div>${list}`;
