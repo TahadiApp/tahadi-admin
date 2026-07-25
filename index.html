@@ -82,7 +82,7 @@
 
   .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:15px;}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:17px;min-width:0;}
-  .w3{grid-column:span 3;} .w4{grid-column:span 4;} .w5{grid-column:span 5;} .w6{grid-column:span 6;} .w7{grid-column:span 7;} .w8{grid-column:span 8;} .w12{grid-column:span 12;}
+  .w2{grid-column:span 2;} .w3{grid-column:span 3;} .w4{grid-column:span 4;} .w5{grid-column:span 5;} .w6{grid-column:span 6;} .w7{grid-column:span 7;} .w8{grid-column:span 8;} .w12{grid-column:span 12;}
   .hd{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;}
   .hd h3{margin:0;font-size:14.5px;}
   .pill{font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;color:var(--muted);background:rgba(255,255,255,.07);border:1px solid var(--line2);white-space:nowrap;}
@@ -217,12 +217,22 @@
       <a data-v="content"><span class="em">📚</span> المحتوى <span class="cnt hidden" id="repCnt">0</span></a>
       <a data-v="control"><span class="em">🎚️</span> التحكم والصيانة</a>
       <a data-v="broadcast"><span class="em">📣</span> البث</a>
+      <a data-v="staff"><span class="em">🛡️</span> المشرفون</a>
     </nav>
 
     <div class="body">
       <!-- ================= OVERVIEW ================= -->
       <section class="view on" id="v-overview">
         <div class="kpis" id="kpis"></div>
+
+        <div class="sectitle">👥 قاعدة اللاعبين <span class="ln"></span></div>
+        <div class="grid">
+          <div class="w4"><div class="stat"><div class="v num" id="b_total" style="color:var(--primary-l)">—</div><div class="l">👥 إجمالي اللاعبين</div><div class="l2">مسجّلون + ضيوف</div></div></div>
+          <div class="w2"><div class="stat"><div class="v num" id="b_reg" style="color:var(--green)">—</div><div class="l">✅ مسجّلون</div></div></div>
+          <div class="w2"><div class="stat"><div class="v num" id="b_guest" style="color:var(--blue)">—</div><div class="l">🎭 ضيوف</div></div></div>
+          <div class="w2"><div class="stat"><div class="v num" id="b_delreg" style="color:var(--red)">—</div><div class="l">🗑️ حذفوا حساباتهم</div></div></div>
+          <div class="w2"><div class="stat"><div class="v num" id="b_delguest" style="color:var(--orange)">—</div><div class="l">🧹 ضيوف حُذفوا</div></div></div>
+        </div>
 
         <div class="sectitle">🎯 النشاط والمباريات <span class="ln"></span></div>
         <div class="grid">
@@ -243,6 +253,22 @@
           <div class="w3"><div class="stat"><div class="v num" id="m_xp" style="color:var(--primary-l)">—</div><div class="l">⚡ XP اليوم</div></div></div>
           <div class="w3"><div class="stat"><div class="v num" id="m_pur" style="color:var(--blue)">—</div><div class="l">🛒 مشتريات اليوم</div><div class="l2" id="m_pur7">—</div></div></div>
           <div class="w3"><div class="stat"><div class="v num" id="m_rev" style="color:var(--green)">—</div><div class="l">💵 إيراد حقيقي (تراكمي)</div></div></div>
+          <div class="w3"><div class="stat"><div class="v num" id="m_fees" style="color:var(--pink)">—</div><div class="l">💸 رسوم التحويلات (تراكمي)</div><div class="l2" id="m_fees_m">—</div></div></div>
+        </div>
+
+        <div class="sectitle">🏆 المتصدرون <span class="ln"></span></div>
+        <div class="grid">
+          <div class="card w12">
+            <div class="hd"><h3>🏆 أعلى اللاعبين</h3>
+              <div class="row" id="topsTabs">
+                <button class="btn sm primary" data-k="coins" onclick="loadTops('coins',this)">🪙 العملات</button>
+                <button class="btn sm" data-k="xp" onclick="loadTops('xp',this)">⚡ نقاط XP</button>
+                <button class="btn sm" data-k="paid" onclick="loadTops('paid',this)">💵 الدافعون</button>
+                <button class="btn sm" data-k="helps" onclick="loadTops('helps',this)">🧰 وسائل المساعدة</button>
+              </div>
+            </div>
+            <div id="topsList"><div class="empty">جارٍ التحميل…</div></div>
+          </div>
         </div>
 
         <div class="sectitle">🛡️ الإشراف والصحة التقنية <span class="ln"></span></div>
@@ -384,6 +410,31 @@
           </div>
         </div>
       </section>
+
+      <!-- ================= STAFF ================= -->
+      <section class="view" id="v-staff">
+        <div class="grid">
+          <div class="card w5">
+            <div class="hd"><h3>🛡️ طاقم الإشراف</h3><span class="pill" id="staffPill">—</span></div>
+            <div id="staffList"><div class="empty">جارٍ التحميل…</div></div>
+            <div class="lbl" id="promoteLbl">➕ ترقية لاعب لمشرف <span style="color:var(--dim);font-weight:400">(للأدمن فقط)</span></div>
+            <div style="display:flex;gap:8px;">
+              <input class="fin" id="stq" placeholder="اسم اللاعب أو رمزه…" autocomplete="off">
+              <button class="btn primary" id="stqBtn">بحث</button>
+            </div>
+            <div id="stResults"></div>
+          </div>
+          <div class="card w7">
+            <div class="hd"><h3>📜 سجل إجراءات الإشراف</h3>
+              <div class="row">
+                <select class="fin" id="auditActor" style="width:180px;padding:7px 10px;"><option value="">كل المشرفين</option></select>
+                <button class="btn sm" id="auditRefresh">↻ تحديث</button>
+              </div>
+            </div>
+            <div id="auditList"><div class="empty">جارٍ التحميل…</div></div>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
 </div>
@@ -402,7 +453,7 @@ const MODE_AR={online:"⚔️ المباشر",friends:"👫 الأصدقاء",ro
 const ACT_AR={solo:"🎯 الفردي",online:"⚔️ المباشر",friends:"👫 الأصدقاء",rooms:"👥 الغرف",room:"👥 الغرف",home:"🏠 الرئيسية",chat:"💬 الدردشة",leaderboard:"🏆 الترتيب",stats:"📊 الإحصائيات",profile:"👤 الحساب",shop:"🛒 المتجر",other:"• أخرى"};
 const ACT_COLOR={solo:"#60A5FA",online:"#A855F7",friends:"#34D399",rooms:"#F472B6",room:"#F472B6",home:"#867AA6",shop:"#FB923C",other:"#867AA6"};
 const MODES=[["online","⚔️ التحدي المباشر"],["solo","🎯 التحدي الفردي"],["friends","👫 تحدي الأصدقاء"],["rooms","👥 الغرف الجماعية"]];
-const SUB={overview:["نظرة عامة","كل مؤشرات التطبيق في مكان واحد"],players:["اللاعبون","بحث وتحكّم في الحسابات"],livechat:["الدردشة الحية","إشراف فوري على المحادثة"],content:["المحتوى","التصنيفات والبلاغات"],control:["التحكم والصيانة","الصيانة والتصنيفات والأوضاع"],broadcast:["البث","إشعارات وإعلانات"]};
+const SUB={overview:["نظرة عامة","كل مؤشرات التطبيق في مكان واحد"],players:["اللاعبون","بحث وتحكّم في الحسابات"],livechat:["الدردشة الحية","إشراف فوري على المحادثة"],content:["المحتوى","التصنيفات والبلاغات"],control:["التحكم والصيانة","الصيانة والتصنيفات والأوضاع"],broadcast:["البث","إشعارات وإعلانات"],staff:["المشرفون","الصلاحيات وسجل الإجراءات"]};
 const fmt=n=>(n==null?"—":Number(n).toLocaleString("en-US"));
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const kv=(k,v)=>`<div><div class="k">${k}</div><div class="val">${v}</div></div>`;
@@ -460,6 +511,10 @@ $("#mcSave").addEventListener("click",saveMatch);
 $("#bcSend").addEventListener("click",broadcast);
 $("#pushSave").addEventListener("click",savePushSettings);
 $("#anCreate").addEventListener("click",createAnnouncement);
+$("#stqBtn").addEventListener("click",stSearch);
+$("#stq").addEventListener("keydown",e=>{if(e.key==="Enter") stSearch();});
+$("#auditRefresh").addEventListener("click",loadAudit);
+$("#auditActor").addEventListener("change",loadAudit);
 
 // ---- view switching ----
 const nav=$("#nav");
@@ -471,6 +526,7 @@ function go(v){
   if(v==="livechat") loadChat();
   if(v==="control") loadControl();
   if(v==="broadcast"){ loadPushSettings(); loadAnnouncements(); }
+  if(v==="staff"){ loadStaff(); loadAudit(); }
 }
 nav.addEventListener("click",e=>{const a=e.target.closest("a"); if(a) go(a.dataset.v);});
 
@@ -486,7 +542,7 @@ async function enter(){
   $("#login").classList.add("hidden"); $("#dash").classList.remove("hidden");
   renderSnapshot(snap);
   renderPeriods(); renderRepFilter();
-  await Promise.all([loadSeries(),loadHeat(),loadCategories(),loadLevels(),loadReports(),loadEvents()]);
+  await Promise.all([loadSeries(),loadHeat(),loadCategories(),loadLevels(),loadReports(),loadEvents(),loadBreakdown(),loadFees(),loadTops("coins")]);
   startRealtime(); startLoop();
 }
 
@@ -1072,7 +1128,102 @@ async function delAnnounce(id){
 
 // ---- live pulse: realtime for events + a fast 3s poll for time-based counts ----
 let loopId=null;
-async function refreshFast(){try{renderSnapshot(await rpc("admin_snapshot")); loadReports(); loadEvents();}catch(e){}}
+// ---- players base + transfer fees + top players (2026-07-25) ----
+async function loadBreakdown(){try{
+  const b=await rpc("admin_players_breakdown");
+  $("#b_total").textContent=fmt(b.total); $("#b_reg").textContent=fmt(b.registered);
+  $("#b_guest").textContent=fmt(b.guests); $("#b_delreg").textContent=fmt(b.deleted_registered);
+  $("#b_delguest").textContent=fmt(b.deleted_guests);
+}catch(e){}}
+async function loadFees(){try{
+  const f=await rpc("admin_transfer_fees");
+  $("#m_fees").textContent="🪙 "+fmt(f.total_fees);
+  $("#m_fees_m").textContent="هذا الشهر: "+fmt(f.month_fees)+" · النسبة "+f.fee_percent+"%";
+}catch(e){}}
+async function loadTops(kind){
+  document.querySelectorAll("#topsTabs .btn").forEach(b=>b.classList.toggle("primary",b.dataset.k===kind));
+  const box=$("#topsList"); box.innerHTML='<div class="empty">جارٍ التحميل…</div>';
+  let rows; try{ rows=await rpc("admin_top_players",{p_kind:kind,p_limit:10}); }
+  catch(e){ box.innerHTML='<div class="empty">تعذّر التحميل</div>'; return; }
+  if(!rows||!rows.length){ box.innerHTML='<div class="empty">لا بيانات بعد</div>'; return; }
+  box.innerHTML=rows.map((p,i)=>{
+    const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":("#"+(i+1));
+    let val="";
+    if(kind==="coins") val="🪙 "+fmt(p.value);
+    else if(kind==="xp") val="⚡ "+fmt(p.value);
+    else if(kind==="paid") val="💵 $"+((p.usd_cents||0)/100).toFixed(2)+" · "+fmt(p.coins_bought)+" 🪙 · "+p.purchases+" عملية";
+    else val="🧰 "+fmt(p.value);
+    const details=(kind==="helps"&&p.details)?'<div style="font-size:11px;color:var(--muted);margin-top:2px;">'+p.details.map(d=>`${d.icon||"🧩"} ${esc(d.name)} ×${d.quantity}`).join(" · ")+"</div>":"";
+    const guest=p.is_guest?' <span class="badge">🎭 ضيف</span>':"";
+    return `<div onclick="openPlayer('${p.id}')" style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--line);">
+      <b style="width:36px;text-align:center;font-size:15px;">${medal}</b>
+      <div style="flex:1"><b>${esc(p.username)}</b>${guest} <span style="color:var(--dim);font-size:11px;">${esc(p.player_code||"")}</span>${details}</div>
+      <div style="font-weight:800;color:var(--gold-l);font-size:13px;white-space:nowrap;">${val}</div></div>`;
+  }).join("");
+}
+
+// ---- staff management + audit trail (2026-07-25) ----
+const AUDIT_AR={set_banned:"حظر/فك حظر الحساب",grant_coins:"منح عملات",set_premium:"تعديل Premium",set_role:"تغيير صلاحية",chat_mute:"كتم من الدردشة",chat_ban:"حظر من الدردشة",chat_unban:"فك حظر الدردشة",chat_delete:"حذف رسالة"};
+let MY_ROLE=null;
+async function loadStaff(){
+  const box=$("#staffList"), sel=$("#auditActor");
+  let rows; try{ rows=await rpc("admin_staff_list"); }
+  catch(e){ box.innerHTML='<div class="empty">تعذّر التحميل</div>'; return; }
+  $("#staffPill").textContent=rows.length+" عضو";
+  const uid=(await sb.auth.getUser()).data.user?.id;
+  MY_ROLE=(rows.find(r=>r.id===uid)||{}).role||null;
+  const isAdmin=MY_ROLE==="admin";
+  $("#promoteLbl").style.display=isAdmin?"":"none";
+  $("#stq").parentElement.style.display=isAdmin?"flex":"none";
+  sel.innerHTML='<option value="">كل المشرفين</option>'+rows.map(r=>`<option value="${r.id}">${esc(r.username)}</option>`).join("");
+  box.innerHTML=rows.map(r=>{
+    const roleBadge=r.role==="admin"?'<span class="badge a">👑 أدمن</span>':'<span class="badge">🛡️ مشرف</span>';
+    const demote=(isAdmin&&r.role==="moderator")?`<button class="btn sm danger" onclick="setRole('${r.id}','user','${esc(r.username)}')">⬇ سحب</button>`:"";
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 6px;border-bottom:1px solid var(--line);">
+      <div style="flex:1;cursor:pointer" onclick="openPlayer('${r.id}')"><b>${esc(r.username)}</b> ${roleBadge}
+        <div style="font-size:11px;color:var(--dim)">${fmt(r.action_count)} إجراء · آخر نشاط ${r.last_active?timeAgo(r.last_active):"—"}</div></div>
+      ${demote}</div>`;
+  }).join("")||'<div class="empty">لا مشرفين</div>';
+}
+async function stSearch(){
+  const q=$("#stq").value.trim(); if(!q) return;
+  const box=$("#stResults"); box.innerHTML='<div class="empty">جارٍ البحث…</div>';
+  let rows; try{ rows=await rpc("admin_search_players",{p_q:q,p_limit:6}); }
+  catch(e){ box.innerHTML='<div class="empty">تعذّر البحث</div>'; return; }
+  rows=rows.filter(p=>!p.is_guest);
+  if(!rows.length){ box.innerHTML='<div class="empty">لا نتائج</div>'; return; }
+  box.innerHTML=rows.map(p=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid var(--line);">
+      <div style="flex:1"><b>${esc(p.username)}</b> <span style="color:var(--dim);font-size:11px;">${esc(p.player_code||"")}</span></div>
+      <button class="btn sm primary" onclick="setRole('${p.id}','moderator','${esc(p.username)}')">🛡️ ترقية لمشرف</button></div>`).join("");
+}
+async function setRole(id,role,name){
+  const msg=role==="moderator"
+    ?`سيحصل «${name}» على صلاحيات الإشراف (كتم، حظر دردشة، إدارة بلاغات…). متابعة؟`
+    :`سيفقد «${name}» صلاحيات الإشراف نهائياً. متابعة؟`;
+  if(await confirmDialog("تأكيد تغيير الصلاحية",msg,role==="user"))
+    act(()=>rpc("admin_set_role",{p_id:id,p_role:role}),"تم تحديث الصلاحية",
+        ()=>{loadStaff();loadAudit();$("#stResults").innerHTML="";$("#stq").value="";});
+}
+async function loadAudit(){
+  const box=$("#auditList"), actor=$("#auditActor").value||null;
+  let rows; try{ rows=await rpc("admin_audit_list",{p_actor:actor,p_limit:60}); }
+  catch(e){ box.innerHTML='<div class="empty">تعذّر التحميل</div>'; return; }
+  if(!rows||!rows.length){ box.innerHTML='<div class="empty">لا إجراءات مسجّلة بعد</div>'; return; }
+  box.innerHTML=rows.map(r=>{
+    const d=r.details||{}; let extra="";
+    if(r.action==="grant_coins") extra=` (${fmt(d.amount)} 🪙)`;
+    if(r.action==="set_banned") extra=d.banned?" (حظر ⛔)":" (فك الحظر ✅)";
+    if(r.action==="set_premium") extra=d.on?" (تفعيل 👑)":" (إيقاف)";
+    if(r.action==="set_role") extra=` (${d.from==="moderator"?"مشرف":"لاعب"} ← ${d.to==="moderator"?"مشرف":"لاعب"})`;
+    return `<div style="display:flex;gap:10px;padding:8px 6px;border-bottom:1px solid var(--line);font-size:12.5px;align-items:center;flex-wrap:wrap;">
+      <span style="color:var(--dim);min-width:58px;">${timeAgo(r.created_at)}</span>
+      <b>${esc(r.actor_name||"؟")}</b>
+      <span style="color:var(--muted)">${AUDIT_AR[r.action]||esc(r.action)}${extra}</span>
+      <span style="color:var(--primary-l)">← ${esc(r.target_name||"—")}</span></div>`;
+  }).join("");
+}
+
+async function refreshFast(){try{renderSnapshot(await rpc("admin_snapshot")); loadReports(); loadEvents(); loadBreakdown();}catch(e){}}
 function startLoop(){if(loopId)clearInterval(loopId); loopId=setInterval(()=>{ if(!document.hidden) refreshFast(); },3000);}
 function startRealtime(){
   sb.channel("admin-live")
