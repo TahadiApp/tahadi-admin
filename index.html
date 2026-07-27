@@ -392,7 +392,20 @@
 
         <div class="sectitle">🪙 الاقتصاد والدخل <span class="ln"></span></div>
         <div class="grid">
-          <div class="w3"><div class="stat"><div class="v num" id="m_coins" style="color:var(--gold-l)">—</div><div class="l">🪙 العملات المتداولة</div></div></div>
+          <div class="w3"><div class="stat">
+            <div style="display:flex;align-items:stretch;gap:12px">
+              <div style="flex:1">
+                <div class="v num" id="m_coins" style="color:var(--gold-l)">—</div>
+                <div class="l">🪙 في المحافظ</div>
+              </div>
+              <div style="width:1px;background:var(--line)"></div>
+              <div style="flex:1">
+                <div class="v num" id="m_spent" style="color:var(--primary-l)">—</div>
+                <div class="l">🛒 أُنفقت</div>
+              </div>
+            </div>
+            <div class="l2" id="m_coins_note">—</div>
+          </div></div>
           <div class="w3"><div class="stat"><div class="v num" id="m_xp" style="color:var(--primary-l)">—</div><div class="l">⚡ XP اليوم</div></div></div>
           <div class="w3"><div class="stat"><div class="v num" id="m_pur" style="color:var(--blue)">—</div><div class="l">🛒 مشتريات اليوم</div><div class="l2" id="m_pur7">—</div></div></div>
           <div class="w3"><div class="stat"><div class="v num" id="m_rev" style="color:var(--green)">—</div><div class="l">💵 إيراد حقيقي (تراكمي)</div></div></div>
@@ -799,7 +812,10 @@ function renderSnapshot(s){
   setT("topMode",top&&top[1]>0?(MODE_AR[top[0]]||top[0]):"لا مباريات الآن");
 
   setT("qTotal","بنك الأسئلة · "+fmt(s.questions_total)+" سؤالاً");
-  setT("m_coins",fmt(s.coins_total)); setT("m_xp",fmt(s.xp_today));
+  setT("m_coins",fmt(s.coins_total)); setT("m_spent",fmt(s.coins_spent)); setT("m_xp",fmt(s.xp_today));
+  // Total minted = still held + already spent, so staff see the whole economy.
+  const minted=(Number(s.coins_total)||0)+(Number(s.coins_spent)||0);
+  setT("m_coins_note","إجمالي ما دخل الاقتصاد: "+fmt(minted)+" 🪙");
   setT("m_pur",fmt(s.purchases_today)); setT("m_pur7",fmt(s.purchases_7d)+" هذا الأسبوع");
   setT("m_rev",fmt(s.revenue_real));
   setT("m_reports",fmt(s.open_reports)); setT("m_banned",fmt(s.banned_count));
