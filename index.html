@@ -487,10 +487,10 @@
           <div class="card w12">
             <div class="hd"><h3>🏆 أعلى اللاعبين</h3>
               <div class="row" id="topsTabs">
-                <button class="btn sm primary" data-k="coins" onclick="loadTops('coins',this)">🪙 العملات</button>
-                <button class="btn sm" data-k="xp" onclick="loadTops('xp',this)">⚡ نقاط XP</button>
-                <button class="btn sm" data-k="paid" onclick="loadTops('paid',this)">💵 الدافعون</button>
-                <button class="btn sm" data-k="helps" onclick="loadTops('helps',this)">🧰 وسائل المساعدة</button>
+                <button class="btn sm primary" data-k="coins" onclick="loadTops('coins')">🪙 العملات</button>
+                <button class="btn sm" data-k="xp" onclick="loadTops('xp')">⚡ نقاط XP</button>
+                <button class="btn sm" data-k="paid" onclick="loadTops('paid')">💵 الدافعون</button>
+                <button class="btn sm" data-k="helps" onclick="loadTops('helps')">🧰 وسائل المساعدة</button>
               </div>
             </div>
             <div id="topsList"><div class="empty">جارٍ التحميل…</div></div>
@@ -1450,7 +1450,7 @@ async function delAnnounce(id){
 }
 
 // ---- live pulse: realtime for events + a fast 3s poll for time-based counts ----
-let loopId=null;
+let loopId=null, slowId=null;
 // ---- players base + transfer fees + top players (2026-07-25) ----
 async function loadBreakdown(){try{
   const b=await rpc("admin_players_breakdown");
@@ -1463,11 +1463,13 @@ async function loadFees(){try{
   $("#m_fees").textContent="🪙 "+fmt(f.total_fees);
   $("#m_fees_m").textContent="هذا الشهر: "+fmt(f.month_fees)+" · النسبة "+f.fee_percent+"%";
 }catch(e){}}
-async function loadTops(kind){
+// `silent` = a background refresh: keep the current list on screen instead of
+// replacing it with a placeholder or an error.
+async function loadTops(kind,silent){
   document.querySelectorAll("#topsTabs .btn").forEach(b=>b.classList.toggle("primary",b.dataset.k===kind));
-  const box=$("#topsList"); box.innerHTML='<div class="empty">جارٍ التحميل…</div>';
+  const box=$("#topsList"); if(!silent) box.innerHTML='<div class="empty">جارٍ التحميل…</div>';
   let rows; try{ rows=await rpc("admin_top_players",{p_kind:kind,p_limit:10}); }
-  catch(e){ box.innerHTML='<div class="empty">تعذّر التحميل</div>'; return; }
+  catch(e){ if(!silent) box.innerHTML='<div class="empty">تعذّر التحميل</div>'; return; }
   if(!rows||!rows.length){ box.innerHTML='<div class="empty">لا بيانات بعد</div>'; return; }
   const valOf=p=>{
     if(kind==="coins") return "🪙 "+fmt(p.value);
@@ -1657,8 +1659,22 @@ async function loadAudit(){
   }).join("");
 }
 
-async function refreshFast(){try{renderSnapshot(await rpc("admin_snapshot")); loadReports(); loadEvents(); loadBreakdown();}catch(e){}}
-function startLoop(){if(loopId)clearInterval(loopId); loopId=setInterval(()=>{ if(!document.hidden) refreshFast(); },3000);}
+// loadFees was missing here: the transfer-fees card only ever ran once at boot,
+// so it sat frozen while every other live number moved.
+async function refreshFast(){try{renderSnapshot(await rpc("admin_snapshot")); loadReports(); loadEvents(); loadBreakdown(); loadFees();}catch(e){}}
+// Heavier lists that also used to load once and then sit stale. They move far
+// slower than the pulse, so 30s — and silent, or the list would flash a
+// "loading" placeholder twice a minute.
+async function refreshSlow(){try{
+  const k=document.querySelector("#topsTabs .btn.primary")?.dataset.k||"coins";
+  loadTops(k,true); susBadge();
+}catch(e){}}
+function startLoop(){
+  if(loopId)clearInterval(loopId);
+  loopId=setInterval(()=>{ if(!document.hidden) refreshFast(); },3000);
+  if(slowId)clearInterval(slowId);
+  slowId=setInterval(()=>{ if(!document.hidden) refreshSlow(); },30000);
+}
 function startRealtime(){
   sb.channel("admin-live")
     .on("postgres_changes",{event:"*",schema:"public",table:"matches"},refreshFast)
