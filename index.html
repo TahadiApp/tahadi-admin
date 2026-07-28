@@ -1018,7 +1018,7 @@ async function loadLevels(){
     return `<div class="bar"><div class="br"><span>🎖️ ${esc(l.level)} <span style="color:var(--dim);font-size:10.5px">(${fmt(l.min_xp)}+ XP)</span></span><b class="num">${fmt(l.players)}</b></div><div class="tr"><div class="fl" style="width:${w}%;background:${cols[i%cols.length]}"></div></div></div>`;}).join("");
 }
 let eventsCache=[];
-const EV_ICON={signup:["✨","rgba(52,211,153,.2)"],match:["🏆","rgba(96,165,250,.2)"],purchase:["🛒","rgba(251,191,36,.2)"],report:["🚩","rgba(248,113,113,.2)"]};
+const EV_ICON={signup:["✨","rgba(52,211,153,.2)"],match:["🏆","rgba(96,165,250,.2)"],purchase:["🛒","rgba(251,191,36,.2)"],report:["🚩","rgba(248,113,113,.2)"],transfer:["🤝","rgba(167,139,250,.22)"]};
 async function loadEvents(){
   eventsCache=await rpc("admin_recent_events",{p_limit:14});
   $("#events").innerHTML=eventsCache.length?eventsCache.map((e,i)=>{const[emoji,bg]=EV_ICON[e.type]||["•","rgba(255,255,255,.1)"];
@@ -1063,6 +1063,15 @@ function openEvent(e){
       ${kv("النوع",esc(d.item_type||"—"))}
       ${kv("السعر",d.price_coins?fmt(d.price_coins)+" 🪙":(d.price_real?d.price_real+" ر.س":"—"))}
       ${kv("وقت الشراء",when(d.at))}
+    </div>`;
+  }else if(e.type==="transfer"){
+    body=`<div class="kv">
+      ${kv("المُرسِل",who(d.sender,d.sender_code))}
+      ${kv("المستلم",who(d.recipient,d.recipient_code))}
+      ${kv("المبلغ المُرسَل",fmt(d.amount||0)+" 🪙")}
+      ${kv("الرسوم",`<span style="color:var(--gold);font-weight:800">${fmt(d.fee||0)} 🪙</span>`)}
+      ${kv("وصل المستلم",`<span style="color:var(--green);font-weight:800">${fmt(d.net||0)} 🪙</span>`)}
+      ${kv("وقت التحويل",when(d.at))}
     </div>`;
   }else if(e.type==="report"){
     const ST={open:"مفتوح",reviewed:"مُعالَج",dismissed:"مرفوض"};
