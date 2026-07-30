@@ -564,6 +564,28 @@
             <div class="fhint">تنطبق على كل الأوضاع. المباريات الجارية تُكمل بالقيمة القديمة؛ أي مباراة جديدة تبدأ بالقيمة الجديدة.</div>
           </div>
           <div class="card w12">
+            <div class="hd"><h3>🎯 نظام المستويات (التحدي الفردي)</h3><span class="pill">يسري فوراً — بلا بناء جديد</span></div>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
+              <div style="width:150px"><label class="flbl">عدد المستويات</label><input class="fin num" id="slTotal" type="number" min="1" max="5000"></div>
+              <div style="width:150px"><label class="flbl">مواجهة كل (مستوى)</label><input class="fin num" id="slBoss" type="number" min="1" max="100"></div>
+              <div style="width:150px"><label class="flbl">حجم العالم (مستوى)</label><input class="fin num" id="slWorld" type="number" min="1" max="200"></div>
+              <div style="width:150px"><label class="flbl">أخطاء المستوى العادي</label><input class="fin num" id="slWrongN" type="number" min="1" max="15"></div>
+              <div style="width:150px"><label class="flbl">أخطاء المواجهة</label><input class="fin num" id="slWrongB" type="number" min="1" max="15"></div>
+            </div>
+            <div style="display:flex;gap:26px;flex-wrap:wrap;margin-top:14px">
+              <div>
+                <label class="flbl">الوسائل في المستوى العادي</label>
+                <div id="slHelpsN" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
+              </div>
+              <div>
+                <label class="flbl">الوسائل في المواجهة</label>
+                <div id="slHelpsB" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
+              </div>
+            </div>
+            <div class="row" style="margin-top:14px"><button class="btn primary" id="slSave">حفظ</button></div>
+            <div class="fhint">اللاعب لا يتخطّى مستوى ولا يعود لمستوى أنهاه. الخسارة تُعيد المستوى نفسه وتكلّف قلباً؛ الفوز يردّ القلب. رفع «عدد المستويات» يفتح المزيد فوراً لمن بلغ النهاية.</div>
+          </div>
+          <div class="card w12">
             <div class="hd"><h3>🗂️ التصنيفات</h3><span class="pill">متاح = يُلعب · قريباً = مقفل · مخفي = لا يظهر</span></div>
             <div id="catCtl"><div class="empty">—</div></div>
           </div>
@@ -776,6 +798,7 @@ $("#tq").addEventListener("keydown",e=>{if(e.key==="Enter"){ go("players"); $("#
 $("#chatRefresh").addEventListener("click",()=>loadChat());
 $("#maintSave").addEventListener("click",saveMaintenance);
 $("#mcSave").addEventListener("click",saveMatch);
+$("#slSave").addEventListener("click",saveLadder);
 $("#bcSend").addEventListener("click",broadcast);
 $("#pushSave").addEventListener("click",savePushSettings);
 $("#anCreate").addEventListener("click",createAnnouncement);
@@ -1341,7 +1364,53 @@ async function loadControl(){
     $("#mcQuestions").value=v.questions_per_match ?? 15;
     $("#mcCountdown").value=v.countdown_seconds ?? 3;
   }catch(e){}
+  try{
+    const l=await sb.from("app_config").select("value").eq("key","solo_ladder").single();
+    const v=(l.data&&l.data.value)||{};
+    $("#slTotal").value=v.total_stages ?? 400;
+    $("#slBoss").value=v.boss_every ?? 10;
+    $("#slWorld").value=v.world_size ?? 20;
+    $("#slWrongN").value=(v.normal&&v.normal.max_wrong) ?? 3;
+    $("#slWrongB").value=(v.boss&&v.boss.max_wrong) ?? 1;
+    renderHelpToggles("slHelpsN",(v.normal&&v.normal.helps)||[]);
+    renderHelpToggles("slHelpsB",(v.boss&&v.boss.helps)||[]);
+  }catch(e){}
 }
+
+// ---- solo ladder (نظام المستويات) ----
+const SL_HELPS=[["fifty","حذف إجابتين"],["replace","استبدال"],["skip","تخطي"],["shield","الدرع"],["double_xp","Double XP"]];
+function renderHelpToggles(id,on){
+  $("#"+id).innerHTML=SL_HELPS.map(([k,lbl])=>
+    `<label class="pill" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+       <input type="checkbox" data-help="${k}" ${on.includes(k)?"checked":""}> ${lbl}</label>`).join("");
+}
+function readHelpToggles(id){
+  return [...document.querySelectorAll(`#${id} input[data-help]`)]
+    .filter(i=>i.checked).map(i=>i.dataset.help);
+}
+async function saveLadder(){
+  const total=parseInt($("#slTotal").value,10), boss=parseInt($("#slBoss").value,10),
+        world=parseInt($("#slWorld").value,10), wn=parseInt($("#slWrongN").value,10),
+        wb=parseInt($("#slWrongB").value,10);
+  if(!(total>=1&&total<=5000)){ toast("عدد المستويات يجب أن يكون بين 1 و5000","err"); return; }
+  if(!(boss>=1&&boss<=100)){ toast("دورية المواجهة يجب أن تكون بين 1 و100","err"); return; }
+  if(!(world>=1&&world<=200)){ toast("حجم العالم يجب أن يكون بين 1 و200","err"); return; }
+  if(!(wn>=1&&wn<=15)||!(wb>=1&&wb<=15)){ toast("عدد الأخطاء يجب أن يكون بين 1 و15","err"); return; }
+  // العالم يجب أن يكون من مضاعفات دورية المواجهة، وإلا وقعت المواجهة في منتصف
+  // عالم ولم تُختم به — وهو ما يكسر معنى «سيّد العالم».
+  if(world%boss!==0){ toast("حجم العالم يجب أن يقبل القسمة على دورية المواجهة","err"); return; }
+  await act(async()=>{
+    // دمج آمن: إن فشلت قراءة القديم لا نكتب إطلاقاً، كي لا نمحو مفاتيح لم تُعرض هنا.
+    const c=await sb.from("app_config").select("value").eq("key","solo_ladder").single();
+    if(c.error||!c.data) throw c.error||new Error("تعذّرت قراءة الإعدادات الحالية");
+    const old=c.data.value||{};
+    const v={...old, total_stages:total, boss_every:boss, world_size:world,
+      normal:{...(old.normal||{}), max_wrong:wn, helps:readHelpToggles("slHelpsN")},
+      boss:{...(old.boss||{}), max_wrong:wb, helps:readHelpToggles("slHelpsB")}};
+    const{error}=await sb.from("app_config").update({value:v}).eq("key","solo_ladder"); if(error)throw error;
+  },"تم حفظ نظام المستويات");
+}
+
 async function saveMatch(){
   const sec=parseInt($("#mcSeconds").value,10), q=parseInt($("#mcQuestions").value,10), cd=parseInt($("#mcCountdown").value,10);
   if(!(sec>=5&&sec<=120)){ toast("المهلة يجب أن تكون بين 5 و120 ثانية","err"); return; }
