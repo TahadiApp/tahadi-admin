@@ -1417,9 +1417,13 @@ async function saveMatch(){
   if(!(q>=1&&q<=50)){ toast("عدد الأسئلة يجب أن يكون بين 1 و50","err"); return; }
   if(!(cd>=0&&cd<=10)){ toast("العدّ التنازلي يجب أن يكون بين 0 و10","err"); return; }
   await act(async()=>{
-    // merge into the existing 'match' config so other keys (room sizes, solo…) are preserved
+    // ندمج داخل مفتاح `match` القائم كي تبقى المفاتيح التي لا تعرضها هذه البطاقة
+    // (أحجام الغرف، إعدادات الفردي، مهلة الدعوة…).
+    // ⚠️ وإن فشلت قراءة القديم لا نكتب إطلاقاً: الدمج مع كائن فارغ كان سيكتب
+    // الحقول الثلاثة وحدها ويمحو البقية بصمت وبلا رسالة خطأ.
     const c=await sb.from("app_config").select("value").eq("key","match").single();
-    const v={...((c.data&&c.data.value)||{}), seconds_per_question:sec, questions_per_match:q, countdown_seconds:cd};
+    if(c.error||!c.data) throw c.error||new Error("تعذّرت قراءة الإعدادات الحالية — لم يُحفظ شيء");
+    const v={...(c.data.value||{}), seconds_per_question:sec, questions_per_match:q, countdown_seconds:cd};
     const{error}=await sb.from("app_config").update({value:v}).eq("key","match"); if(error)throw error;
   },"تم حفظ إعدادات المباراة");
 }
@@ -1430,8 +1434,11 @@ async function saveMaintenance(){
 }
 async function setMode(key,soon){
   await act(async()=>{
+    // ⚠️ نفس حارس `saveMatch`: فشل القراءة هنا كان سيكتب وضعاً واحداً ويمحو
+    // حالة الأوضاع الثلاثة الأخرى بصمت — فتُفتح أوضاع مقفلة أو تُقفل مفتوحة.
     const c=await sb.from("app_config").select("value").eq("key","mode_status").single();
-    const v={...((c.data&&c.data.value)||{}),[key]:soon};
+    if(c.error||!c.data) throw c.error||new Error("تعذّرت قراءة حالة الأوضاع — لم يُحفظ شيء");
+    const v={...(c.data.value||{}),[key]:soon};
     const{error}=await sb.from("app_config").update({value:v}).eq("key","mode_status"); if(error)throw error;
   },"تم تحديث الوضع",loadControl);
 }
