@@ -1224,6 +1224,7 @@ async function openPlayer(id){
         ? `<button class="btn" onclick="pAct('revoke','${p.id}')">إلغاء Premium</button>`
         : `<button class="btn gold" onclick="pAct('grant','${p.id}')">👑 منح Premium</button>`}
       <button class="btn" onclick="pAct('coins','${p.id}')">🪙 تعديل العملات</button>
+        <button class="btn" onclick="pAct('xp','${p.id}',${p.xp||0})">⭐️ تعديل الخبرة</button>
       <button class="btn primary" onclick="pAct('message','${p.id}')">📩 مراسلة</button>
     </div>`;
   showModal(`👤 ${esc(p.username)} <span style="color:var(--dim);font-size:12px">${esc(p.player_code||"")}</span>`,`
@@ -1243,7 +1244,7 @@ async function openPlayer(id){
     ${p.bio?`<div class="lbl">النبذة</div><div class="qbox" style="font-weight:400">${esc(p.bio)}</div>`:""}
     ${cats?`<div class="lbl">الأداء حسب التصنيف</div><div class="bars">${cats}</div>`:""}`);
 }
-async function pAct(kind,id){
+async function pAct(kind,id,extra){
   const refresh=async()=>{ if(window._reopenPlayer) await window._reopenPlayer(); refreshFast(); };
   if(kind==="ban"){ if(await confirmDialog("حظر الحساب","سيُمنع اللاعب من الدخول للتطبيق نهائياً حتى فك الحظر. متابعة؟",true))
       act(()=>rpc("admin_set_banned",{p_id:id,p_banned:true}),"تم حظر الحساب",refresh); }
@@ -1254,8 +1255,42 @@ async function pAct(kind,id){
   else if(kind==="revoke"){ if(await confirmDialog("إلغاء Premium","سيُلغى اشتراك Premium فوراً. متابعة؟",true))
       act(()=>rpc("admin_set_premium",{p_id:id,p_on:false}),"تم إلغاء Premium",refresh); }
   else if(kind==="coins"){ coinsDialog(id,refresh); }
+  else if(kind==="xp"){ xpDialog(id,extra,refresh); }
   else if(kind==="message"){ messageDialog(id); }
 }
+// Set XP to an exact figure.
+//
+// Unlike the coins dialog this REPLACES rather than adds, so the current value
+// is shown and pre-filled: an absolute field left blank invites an admin to
+// type a number without knowing what it overwrites.
+//
+// The rank is not set here. A trigger on `players` recomputes it from XP on
+// every write, so it follows automatically — up or down.
+function xpDialog(id,current,after){
+  const cur=current||0;
+  const ov=document.createElement("div"); ov.className="ov";
+  ov.innerHTML=`<div class="modal sm"><div class="mh"><h3>⭐️ تعديل نقاط الخبرة</h3><button class="x">✕</button></div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">الرصيد الحالي: <b style="color:var(--gold)">${fmt(cur)}</b> XP</div>
+    <label class="flbl">القيمة الجديدة (تحلّ محلّ القديمة)</label>
+    <input class="fin num" id="xpVal" type="number" min="0" value="${cur}" style="text-align:center">
+    <div style="font-size:12px;color:var(--dim);margin-top:8px;line-height:1.6;">
+      يتغيّر مستوى اللاعب تلقائياً حسب القيمة الجديدة، ويصله إشعار بذلك.</div>
+    <div class="row" style="margin-top:14px;"><button class="btn primary" id="xpOk">تطبيق</button></div></div>`;
+  const close=()=>ov.remove(); ov.querySelector(".x").onclick=close; ov.onclick=e=>{if(e.target===ov)close();};
+  ov.querySelector("#xpOk").onclick=async()=>{
+    const n=parseInt(ov.querySelector("#xpVal").value,10);
+    if(isNaN(n)||n<0){toast("أدخل رقماً صفراً أو أكبر","err");return;}
+    if(n===cur){toast("القيمة لم تتغيّر","err");return;}
+    // An absolute overwrite of a player's whole history deserves one question.
+    if(!await confirmDialog("تعديل الخبرة",
+      `ستُستبدل خبرة اللاعب من <b>${fmt(cur)}</b> إلى <b>${fmt(n)}</b>، وقد يتغيّر مستواه. متابعة؟`,
+      n<cur)) return;
+    close();
+    act(()=>rpc("admin_set_xp",{p_id:id,p_xp:n}),"تم تعديل الخبرة",after);};
+  document.body.appendChild(ov);
+  setTimeout(()=>{const f=ov.querySelector("#xpVal"); f.focus(); f.select();},50);
+}
+
 // Send a player a message that shows up in their notifications as "من الإدارة".
 function messageDialog(id){
   const ov=document.createElement("div"); ov.className="ov";
