@@ -547,6 +547,16 @@
             <label class="switch" style="margin-bottom:12px;"><input type="checkbox" id="maintToggle"><span class="track"></span><span style="font-size:13px;font-weight:700">إيقاف التطبيق للصيانة</span></label>
             <label class="flbl">رسالة الصيانة (تظهر للاعبين)</label>
             <textarea class="fin" id="maintMsg" placeholder="نُجري تحديثاً سريعاً — نعود بعد قليل."></textarea>
+            <div style="display:flex;gap:12px;align-items:flex-end;margin-top:12px">
+              <div style="width:190px">
+                <label class="flbl">مؤقّت العودة (دقيقة)</label>
+                <input class="fin num" id="maintMins" type="number" min="0" max="1440" placeholder="0">
+              </div>
+              <label class="pill" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;height:38px">
+                <input type="checkbox" id="maintRestart"> إعادة تشغيل المؤقّت الآن
+              </label>
+            </div>
+            <div class="fhint" id="maintLeft">0 = بلا مؤقّت. وإن انتهى الوقت والتطبيق ما زال مغلقاً، يبدأ المؤقّت مدةً جديدة تلقائياً بلا تدخّل.</div>
             <div class="row" style="margin-top:12px;"><button class="btn primary" id="maintSave">حفظ</button></div>
           </div>
           <div class="card w7">
@@ -581,6 +591,16 @@
                 <label class="flbl">الوسائل في المواجهة</label>
                 <div id="slHelpsB" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
               </div>
+            </div>
+            <div style="margin-top:16px">
+              <label class="flbl">التصنيفات المتاحة في التحدي الفردي</label>
+              <div id="slCats" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><div class="empty">—</div></div>
+              <div class="fhint">أسئلة السلّم تُسحب من هذه التصنيفات وحدها. اختيار واحد على الأقل — وبلا اختيار لا يستطيع أحد بدء مرحلة.</div>
+            </div>
+            <div style="margin-top:14px;width:260px">
+              <label class="flbl">التصنيف الافتراضي</label>
+              <select class="fin" id="slDefCat"></select>
+              <div class="fhint">يُستعمل حين لا يُحدَّد تصنيف. يجب أن يكون من المتاحة أعلاه.</div>
             </div>
             <div class="row" style="margin-top:14px"><button class="btn primary" id="slSave">حفظ</button></div>
             <div class="fhint">اللاعب لا يتخطّى مستوى ولا يعود لمستوى أنهاه. الخسارة تُعيد المستوى نفسه وتكلّف قلباً؛ الفوز يردّ القلب. رفع «عدد المستويات» يفتح المزيد فوراً لمن بلغ النهاية.</div>
@@ -1374,6 +1394,9 @@ async function loadControl(){
   try{
     const m=await sb.from("app_config").select("value").eq("key","maintenance").single();
     const v=(m.data&&m.data.value)||{}; $("#maintToggle").checked=v.enabled===true; $("#maintMsg").value=v.message||"";
+    $("#maintMins").value=v.countdown_minutes||0;
+    $("#maintRestart").checked=false;
+    showMaintLeft(v);
   }catch(e){}
   try{
     const c=await sb.from("app_config").select("value").eq("key","mode_status").single();
@@ -1409,7 +1432,19 @@ async function loadControl(){
     $("#slWrongB").value=(v.boss&&v.boss.max_wrong) ?? 1;
     renderHelpToggles("slHelpsN",(v.normal&&v.normal.helps)||[]);
     renderHelpToggles("slHelpsB",(v.boss&&v.boss.helps)||[]);
-  }catch(e){}
+    await renderSoloCats(v.categories_enabled||[], v.default_category);
+  }catch(e){ $("#slCats").innerHTML=`<div class="empty">تعذّر التحميل</div>`; }
+}
+
+/// المتبقّي على العودة، بنفس حساب التطبيق: النافذة تتجدّد ولا تقف عند صفر.
+function showMaintLeft(v){
+  const el=$("#maintLeft"); if(!el) return;
+  const mins=v.countdown_minutes||0, started=v.started_at?new Date(v.started_at):null;
+  const base="0 = بلا مؤقّت. وإن انتهى الوقت والتطبيق ما زال مغلقاً، يبدأ المؤقّت مدةً جديدة تلقائياً بلا تدخّل.";
+  if(!mins||!started||isNaN(+started)){ el.textContent=base; return; }
+  const win=mins*60000, elapsed=Date.now()-started.getTime();
+  const into=elapsed<0?0:elapsed%win, left=Math.ceil((win-into)/60000);
+  el.textContent=`${base} — المتبقّي الآن ${left} دقيقة تقريباً.`;
 }
 
 // ---- solo ladder (نظام المستويات) ----
@@ -1423,6 +1458,38 @@ function readHelpToggles(id){
   return [...document.querySelectorAll(`#${id} input[data-help]`)]
     .filter(i=>i.checked).map(i=>i.dataset.help);
 }
+
+// ---- التصنيفات المتاحة في التحدي الفردي ----
+// المخفيّة و«قريباً» تُعرض مطفأةً بدل أن تُخفى: التصنيف قد يكون مفعّلاً في
+// السلّم ثم يُخفى من قائمة التصنيفات، وإخفاؤه هنا كان سيترك السلّم يسحب من
+// تصنيف لا أثر له في هذه البطاقة.
+let SOLO_CATS=[];
+async function renderSoloCats(on,def){
+  const c=await sb.from("categories").select("id,name_ar,icon,is_active,coming_soon").order("sort_order");
+  SOLO_CATS=c.data||[];
+  const ids=new Set((on||[]).map(Number));
+  $("#slCats").innerHTML=SOLO_CATS.map(x=>{
+    const playable = x.is_active===true && x.coming_soon!==true;
+    const warn = playable ? "" : (x.is_active!==true ? " · مخفي" : " · قريباً");
+    return `<label class="pill" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;${playable?"":"opacity:.6"}">
+      <input type="checkbox" data-cat="${x.id}" ${ids.has(x.id)?"checked":""} onchange="syncSoloDefault()">
+      ${x.icon||"❓"} ${esc(x.name_ar||"")}<span style="font-size:11px;opacity:.7">${warn}</span></label>`;}).join("")
+    || `<div class="empty">لا توجد تصنيفات</div>`;
+  syncSoloDefault(def);
+}
+function readSoloCats(){
+  return [...document.querySelectorAll('#slCats input[data-cat]')]
+    .filter(i=>i.checked).map(i=>parseInt(i.dataset.cat,10));
+}
+/// القائمة المنسدلة تعرض المختار فقط، فيستحيل أن يشير الافتراضي إلى تصنيف مغلق.
+function syncSoloDefault(keep){
+  const on=readSoloCats(), sel=$("#slDefCat");
+  const want=keep ?? parseInt(sel.value,10);
+  sel.innerHTML=on.length
+    ? on.map(id=>{const c=SOLO_CATS.find(x=>x.id===id)||{};
+        return `<option value="${id}" ${id===want?"selected":""}>${c.icon||"❓"} ${esc(c.name_ar||id)}</option>`;}).join("")
+    : `<option value="">— اختر تصنيفاً أولاً —</option>`;
+}
 async function saveLadder(){
   const total=parseInt($("#slTotal").value,10), boss=parseInt($("#slBoss").value,10),
         world=parseInt($("#slWorld").value,10), wn=parseInt($("#slWrongN").value,10),
@@ -1434,12 +1501,23 @@ async function saveLadder(){
   // العالم يجب أن يكون من مضاعفات دورية المواجهة، وإلا وقعت المواجهة في منتصف
   // عالم ولم تُختم به — وهو ما يكسر معنى «سيّد العالم».
   if(world%boss!==0){ toast("حجم العالم يجب أن يقبل القسمة على دورية المواجهة","err"); return; }
+
+  const cats=readSoloCats();
+  // بلا تصنيف واحد على الأقل لا يجد السلّم أسئلة، فيعطب الوضع الفردي كله بصمت.
+  if(!cats.length){ toast("اختر تصنيفاً واحداً على الأقل للتحدي الفردي","err"); return; }
+  const def=parseInt($("#slDefCat").value,10);
+  if(!cats.includes(def)){ toast("التصنيف الافتراضي يجب أن يكون من المتاحة","err"); return; }
+  const shut=cats.filter(id=>{const c=SOLO_CATS.find(x=>x.id===id);
+    return c && (c.is_active!==true || c.coming_soon===true);});
+  if(shut.length && !confirm("بعض التصنيفات المختارة مخفية أو «قريباً» — لن يراها اللاعب في القوائم لكن السلّم سيسحب أسئلتها. متابعة؟")) return;
+
   await act(async()=>{
     // دمج آمن: إن فشلت قراءة القديم لا نكتب إطلاقاً، كي لا نمحو مفاتيح لم تُعرض هنا.
     const c=await sb.from("app_config").select("value").eq("key","solo_ladder").single();
     if(c.error||!c.data) throw c.error||new Error("تعذّرت قراءة الإعدادات الحالية");
     const old=c.data.value||{};
     const v={...old, total_stages:total, boss_every:boss, world_size:world,
+      categories_enabled:cats, default_category:def,
       normal:{...(old.normal||{}), max_wrong:wn, helps:readHelpToggles("slHelpsN")},
       boss:{...(old.boss||{}), max_wrong:wb, helps:readHelpToggles("slHelpsB")}};
     const{error}=await sb.from("app_config").update({value:v}).eq("key","solo_ladder"); if(error)throw error;
@@ -1464,8 +1542,26 @@ async function saveMatch(){
 }
 async function saveMaintenance(){
   const enabled=$("#maintToggle").checked, message=$("#maintMsg").value.trim();
-  await act(async()=>{ const{error}=await sb.from("app_config").update({value:{enabled,message}}).eq("key","maintenance"); if(error)throw error; },
-    "تم حفظ إعدادات الصيانة", refreshFast);
+  const mins=parseInt($("#maintMins").value,10)||0;
+  if(!(mins>=0&&mins<=1440)){ toast("المؤقّت يجب أن يكون بين 0 و1440 دقيقة","err"); return; }
+  await act(async()=>{
+    // ⚠️ دمج آمن كبقية البطاقات. كانت هذه تكتب {enabled,message} فقط، فأي مفتاح
+    // آخر في `maintenance` يُمحى بصمت — ولحظة إضافة المؤقّت صار ذلك خطأً حقيقياً
+    // لا احتمالاً: كل حفظ للرسالة كان سيمسح المؤقّت.
+    const c=await sb.from("app_config").select("value").eq("key","maintenance").single();
+    if(c.error||!c.data) throw c.error||new Error("تعذّرت قراءة الإعدادات الحالية — لم يُحفظ شيء");
+    const old=c.data.value||{};
+
+    // متى يبدأ المؤقّت من جديد: عند تشغيل الصيانة، أو تغيير المدة، أو طلب صريح.
+    // وبغير ذلك يبقى وقت البدء كما هو، فتعديل الرسالة لا يمدّ الوعد للاعبين.
+    const turnedOn = enabled && old.enabled!==true;
+    const changedMins = mins!==(old.countdown_minutes||0);
+    const restart = $("#maintRestart").checked || turnedOn || changedMins;
+    const startedAt = mins>0 ? (restart||!old.started_at ? new Date().toISOString() : old.started_at) : null;
+
+    const v={...old, enabled, message, countdown_minutes:mins, started_at:startedAt};
+    const{error}=await sb.from("app_config").update({value:v}).eq("key","maintenance"); if(error)throw error;
+  },"تم حفظ إعدادات الصيانة", ()=>{ refreshFast(); loadControl(); });
 }
 async function setMode(key,soon){
   await act(async()=>{
