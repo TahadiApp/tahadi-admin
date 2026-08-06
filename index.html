@@ -575,13 +575,13 @@
             <div class="fhint">تنطبق على كل الأوضاع. المباريات الجارية تُكمل بالقيمة القديمة؛ أي مباراة جديدة تبدأ بالقيمة الجديدة.</div>
           </div>
           <div class="card w12">
-            <div class="hd"><h3>🎯 نظام المستويات (التحدي الفردي)</h3><span class="pill">يسري فوراً — بلا بناء جديد</span></div>
+            <div class="hd"><h3>🎯 نظام المراحل (التحدي الفردي)</h3><span class="pill">يسري فوراً — بلا بناء جديد</span></div>
             <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
-              <div style="width:150px"><label class="flbl">عدد المستويات</label><input class="fin num" id="slTotal" type="number" min="1" max="5000"></div>
+              <div style="width:150px"><label class="flbl">عدد المراحل</label><input class="fin num" id="slTotal" type="number" min="1" max="5000"></div>
               <div style="width:150px"><label class="flbl">مواجهة كل (مستوى)</label><input class="fin num" id="slBoss" type="number" min="1" max="100"></div>
               <div style="width:150px"><label class="flbl">حجم العالم (مستوى)</label><input class="fin num" id="slWorld" type="number" min="1" max="200"></div>
               <div style="width:150px"><label class="flbl">أخطاء المستوى العادي</label><input class="fin num" id="slWrongN" type="number" min="1" max="15"></div>
-              <div style="width:150px"><label class="flbl">أخطاء المواجهة</label><input class="fin num" id="slWrongB" type="number" min="1" max="15"></div>
+              <div style="width:150px"><label class="flbl">أخطاء التحدي الكبير</label><input class="fin num" id="slWrongB" type="number" min="1" max="15"></div>
             </div>
             <div style="display:flex;gap:26px;flex-wrap:wrap;margin-top:14px">
               <div>
@@ -589,22 +589,22 @@
                 <div id="slHelpsN" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
               </div>
               <div>
-                <label class="flbl">الوسائل في المواجهة</label>
+                <label class="flbl">الوسائل في التحدي الكبير</label>
                 <div id="slHelpsB" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>
               </div>
             </div>
             <div style="margin-top:16px">
-              <label class="flbl">التصنيفات المتاحة في التحدي الفردي</label>
+              <label class="flbl">التصنيفات التي يختار منها اللاعب</label>
               <div id="slCats" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><div class="empty">—</div></div>
-              <div class="fhint">أسئلة السلّم تُسحب من هذه التصنيفات وحدها. اختيار واحد على الأقل — وبلا اختيار لا يستطيع أحد بدء مرحلة.</div>
+              <div class="fhint">هذه هي البطاقات التي تظهر للاعب في صفحة التحدي الفردي، ويختار منها تصنيف كل مرحلة عادية. اختيار واحد على الأقل — وبلا اختيار لا يجد اللاعب ما يبدأ به.</div>
             </div>
             <div style="margin-top:14px;width:260px">
-              <label class="flbl">التصنيف الافتراضي</label>
+              <label class="flbl">تصنيف «التحدي الكبير»</label>
               <select class="fin" id="slDefCat"></select>
-              <div class="fhint">يُستعمل حين لا يُحدَّد تصنيف. يجب أن يكون من المتاحة أعلاه.</div>
+              <div class="fhint">المرحلة الصعبة كل 10 مراحل تُلعب في هذا التصنيف وحده، بلا اختيار للاعب. و«ثقافة عامة» هي الافتراضي لأنها تسحب من كل التصنيفات. ولا يلزم أن يكون من المختارة أعلاه.</div>
             </div>
             <div class="row" style="margin-top:14px"><button class="btn primary" id="slSave">حفظ</button></div>
-            <div class="fhint">اللاعب لا يتخطّى مستوى ولا يعود لمستوى أنهاه. الخسارة تُعيد المستوى نفسه وتكلّف قلباً؛ الفوز يردّ القلب. رفع «عدد المستويات» يفتح المزيد فوراً لمن بلغ النهاية.</div>
+            <div class="fhint">اللاعب لا يتخطّى مرحلة ولا يعود لمرحلة أنهاها. الخسارة تُعيد المرحلة نفسها وتكلّف قلباً؛ الفوز يردّ القلب. رفع «عدد المراحل» يفتح المزيد فوراً لمن بلغ النهاية.</div>
           </div>
           <div class="card w12">
             <div class="hd"><h3>🗂️ التصنيفات</h3><span class="pill">متاح = يُلعب · قريباً = مقفل · مخفي = لا يظهر</span></div>
@@ -1448,7 +1448,7 @@ function showMaintLeft(v){
   el.textContent=`${base} — المتبقّي الآن ${left} دقيقة تقريباً.`;
 }
 
-// ---- solo ladder (نظام المستويات) ----
+// ---- solo ladder (نظام المراحل) ----
 const SL_HELPS=[["fifty","حذف إجابتين"],["replace","استبدال"],["skip","تخطي"],["shield","الدرع"],["double_xp","Double XP"]];
 function renderHelpToggles(id,on){
   $("#"+id).innerHTML=SL_HELPS.map(([k,lbl])=>
@@ -1482,35 +1482,39 @@ function readSoloCats(){
   return [...document.querySelectorAll('#slCats input[data-cat]')]
     .filter(i=>i.checked).map(i=>parseInt(i.dataset.cat,10));
 }
-/// القائمة المنسدلة تعرض المختار فقط، فيستحيل أن يشير الافتراضي إلى تصنيف مغلق.
+/// تصنيف «التحدي الكبير» مستقلّ عمّا يختاره اللاعب: القائمة تعرض كل التصنيفات،
+/// لأن إغلاق «ثقافة عامة» أمام المراحل العادية يجب ألّا يعطّل التحدي الكبير.
 function syncSoloDefault(keep){
-  const on=readSoloCats(), sel=$("#slDefCat");
+  const sel=$("#slDefCat");
   const want=keep ?? parseInt(sel.value,10);
-  sel.innerHTML=on.length
-    ? on.map(id=>{const c=SOLO_CATS.find(x=>x.id===id)||{};
-        return `<option value="${id}" ${id===want?"selected":""}>${c.icon||"❓"} ${esc(c.name_ar||id)}</option>`;}).join("")
-    : `<option value="">— اختر تصنيفاً أولاً —</option>`;
+  sel.innerHTML=SOLO_CATS.length
+    ? SOLO_CATS.map(c=>`<option value="${c.id}" ${c.id===want?"selected":""}>${c.icon||"❓"} ${esc(c.name_ar||c.id)}</option>`).join("")
+    : `<option value="">— لا توجد تصنيفات —</option>`;
 }
 async function saveLadder(){
   const total=parseInt($("#slTotal").value,10), boss=parseInt($("#slBoss").value,10),
         world=parseInt($("#slWorld").value,10), wn=parseInt($("#slWrongN").value,10),
         wb=parseInt($("#slWrongB").value,10);
-  if(!(total>=1&&total<=5000)){ toast("عدد المستويات يجب أن يكون بين 1 و5000","err"); return; }
-  if(!(boss>=1&&boss<=100)){ toast("دورية المواجهة يجب أن تكون بين 1 و100","err"); return; }
+  if(!(total>=1&&total<=5000)){ toast("عدد المراحل يجب أن يكون بين 1 و5000","err"); return; }
+  if(!(boss>=1&&boss<=100)){ toast("دورية التحدي الكبير يجب أن تكون بين 1 و100","err"); return; }
   if(!(world>=1&&world<=200)){ toast("حجم العالم يجب أن يكون بين 1 و200","err"); return; }
   if(!(wn>=1&&wn<=15)||!(wb>=1&&wb<=15)){ toast("عدد الأخطاء يجب أن يكون بين 1 و15","err"); return; }
-  // العالم يجب أن يكون من مضاعفات دورية المواجهة، وإلا وقعت المواجهة في منتصف
+  // العالم يجب أن يكون من مضاعفات دورية التحدي الكبير، وإلا وقع التحدي الكبير في منتصف
   // عالم ولم تُختم به — وهو ما يكسر معنى «سيّد العالم».
-  if(world%boss!==0){ toast("حجم العالم يجب أن يقبل القسمة على دورية المواجهة","err"); return; }
+  if(world%boss!==0){ toast("حجم العالم يجب أن يقبل القسمة على دورية التحدي الكبير","err"); return; }
 
   const cats=readSoloCats();
-  // بلا تصنيف واحد على الأقل لا يجد السلّم أسئلة، فيعطب الوضع الفردي كله بصمت.
+  // بلا تصنيف واحد على الأقل لا يجد اللاعب بطاقة يبدأ منها، فيعطب الوضع كله بصمت.
   if(!cats.length){ toast("اختر تصنيفاً واحداً على الأقل للتحدي الفردي","err"); return; }
   const def=parseInt($("#slDefCat").value,10);
-  if(!cats.includes(def)){ toast("التصنيف الافتراضي يجب أن يكون من المتاحة","err"); return; }
+  // لا يُشترط أن يكون تصنيف «التحدي الكبير» من المختارة — فهو مستقلّ عمّا
+  // يلعبه اللاعب. لكن تصنيفاً مخفياً أو «قريباً» بلا أسئلة يوقف المرحلة نفسها.
+  const bossCat=SOLO_CATS.find(x=>x.id===def);
+  if(!bossCat){ toast("اختر تصنيفاً لـ«التحدي الكبير»","err"); return; }
+  if(bossCat.is_active!==true && !confirm("تصنيف «التحدي الكبير» مخفي — المرحلة الصعبة ستسحب أسئلته رغم ذلك. متابعة؟")) return;
   const shut=cats.filter(id=>{const c=SOLO_CATS.find(x=>x.id===id);
     return c && (c.is_active!==true || c.coming_soon===true);});
-  if(shut.length && !confirm("بعض التصنيفات المختارة مخفية أو «قريباً» — لن يراها اللاعب في القوائم لكن السلّم سيسحب أسئلتها. متابعة؟")) return;
+  if(shut.length && !confirm("بعض التصنيفات المختارة مخفية أو «قريباً» — ستظهر للاعب مقفلةً بوسم «قريباً» ولا يستطيع بدء مرحلة بها. متابعة؟")) return;
 
   await act(async()=>{
     // دمج آمن: إن فشلت قراءة القديم لا نكتب إطلاقاً، كي لا نمحو مفاتيح لم تُعرض هنا.
@@ -1522,7 +1526,7 @@ async function saveLadder(){
       normal:{...(old.normal||{}), max_wrong:wn, helps:readHelpToggles("slHelpsN")},
       boss:{...(old.boss||{}), max_wrong:wb, helps:readHelpToggles("slHelpsB")}};
     const{error}=await sb.from("app_config").update({value:v}).eq("key","solo_ladder"); if(error)throw error;
-  },"تم حفظ نظام المستويات");
+  },"تم حفظ نظام المراحل");
 }
 
 async function saveMatch(){
