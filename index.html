@@ -564,6 +564,15 @@
             <div class="hd"><h3>🎮 أوضاع اللعب</h3><span class="pill">متاح / قريباً</span></div>
             <div id="modeCtl"><div class="empty">—</div></div>
           </div>
+          <div class="card w5">
+            <div class="hd"><h3>📺 الإعلانات</h3><span class="pill">يسري عند فتح التطبيق</span></div>
+            <div style="width:230px">
+              <label class="flbl">الإعلان البيني — مرة كل كم مباراة</label>
+              <input class="fin num" id="adEvery" type="number" min="1" max="20">
+            </div>
+            <div class="fhint">هذا أحسّ رقم في الإعلانات كلها: تصغيره يرفع الدخل ويُنفّر اللاعبين، وتكبيره العكس. <b>3</b> نقطة بداية معقولة، وتُضبط على أرقامك الحقيقية بعد الإطلاق بأيام. والمشترك لا يرى هذا الإعلان مهما كان الرقم.</div>
+            <div class="row" style="margin-top:12px"><button class="btn primary" id="adSave">حفظ</button></div>
+          </div>
           <div class="card w12">
             <div class="hd"><h3>⏱️ إعدادات المباراة</h3><span class="pill">يسري فوراً على كل اللاعبين</span></div>
             <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
@@ -818,6 +827,7 @@ $("#q").addEventListener("keydown",e=>{if(e.key==="Enter") searchPlayers();});
 $("#tq").addEventListener("keydown",e=>{if(e.key==="Enter"){ go("players"); $("#q").value=$("#tq").value; searchPlayers(); }});
 $("#chatRefresh").addEventListener("click",()=>loadChat());
 $("#maintSave").addEventListener("click",saveMaintenance);
+$("#adSave").addEventListener("click",saveAds);
 $("#mcSave").addEventListener("click",saveMatch);
 $("#slSave").addEventListener("click",saveLadder);
 $("#bcSend").addEventListener("click",broadcast);
@@ -1400,6 +1410,10 @@ async function loadControl(){
     showMaintLeft(v);
   }catch(e){}
   try{
+    const a=await sb.from("app_config").select("value").eq("key","ads").single();
+    $("#adEvery").value=((a.data&&a.data.value)||{}).interstitial_every ?? 3;
+  }catch(e){ $("#adEvery").value=3; }
+  try{
     const c=await sb.from("app_config").select("value").eq("key","mode_status").single();
     const st=(c.data&&c.data.value)||{};
     $("#modeCtl").innerHTML=MODES.map(([k,lbl])=>{const soon=st[k]===true;
@@ -1491,6 +1505,19 @@ function syncSoloDefault(keep){
     ? SOLO_CATS.map(c=>`<option value="${c.id}" ${c.id===want?"selected":""}>${c.icon||"❓"} ${esc(c.name_ar||c.id)}</option>`).join("")
     : `<option value="">— لا توجد تصنيفات —</option>`;
 }
+// دورية الإعلان البيني. تُكتب بـ jsonb_set لا باستبدال الكائن، فلا تمحو
+// مفاتيح إعلانات أخرى تُضاف مستقبلاً — وهو الخطأ الذي وقع في حفظ الصيانة.
+async function saveAds(){
+  const n=parseInt($("#adEvery").value,10);
+  if(!(n>=1&&n<=20)){ toast("الرقم يجب أن يكون بين 1 و20","err"); return; }
+  await act(async()=>{
+    const cur=await sb.from("app_config").select("value").eq("key","ads").single();
+    const v=Object.assign({},(cur.data&&cur.data.value)||{},{interstitial_every:n});
+    const {error}=await sb.from("app_config").update({value:v}).eq("key","ads");
+    if(error) throw error;
+  },"تم حفظ إعدادات الإعلانات", loadControl);
+}
+
 async function saveLadder(){
   const total=parseInt($("#slTotal").value,10), boss=parseInt($("#slBoss").value,10),
         world=parseInt($("#slWorld").value,10), wn=parseInt($("#slWrongN").value,10),
