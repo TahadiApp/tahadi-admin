@@ -565,6 +565,21 @@
             <div id="modeCtl"><div class="empty">—</div></div>
           </div>
           <div class="card w5">
+            <div class="hd"><h3>📢 تنبيه إغلاق قادم</h3><span class="pill" id="noticePill">—</span></div>
+            <div class="fhint" style="margin-bottom:10px">لا يُخرَج أحد من التطبيق فجأة — قد يكون لاعب داخل تحدٍّ فيخسر محاولته. هذا التنبيه يظهر لكل من يلعب الآن، في أي شاشة كان، ومعه مؤقّت. وعند انتهائه يغلق التطبيق نفسه.</div>
+            <label class="flbl">العبارة التي يراها اللاعبون</label>
+            <textarea class="fin" id="noticeMsg" placeholder="سيتوقف التطبيق مؤقتاً للصيانة — أنهِ ما بين يديك."></textarea>
+            <div style="width:200px;margin-top:12px">
+              <label class="flbl">المهلة (دقيقة)</label>
+              <input class="fin num" id="noticeMins" type="number" min="1" max="120" value="10">
+            </div>
+            <div class="row" style="margin-top:12px">
+              <button class="btn primary" id="noticeSend">إرسال التنبيه</button>
+              <button class="btn" id="noticeCancel">إلغاء التنبيه</button>
+            </div>
+            <div class="fhint" id="noticeLeft"></div>
+          </div>
+          <div class="card w5">
             <div class="hd"><h3>📺 الإعلانات</h3><span class="pill">يسري عند فتح التطبيق</span></div>
             <div style="width:230px">
               <label class="flbl">الإعلان البيني — مرة كل كم مباراة</label>
@@ -613,7 +628,7 @@
               <div class="fhint">المرحلة الصعبة كل 10 مراحل تُلعب في هذا التصنيف وحده، بلا اختيار للاعب. و«ثقافة عامة» هي الافتراضي لأنها تسحب من كل التصنيفات. ولا يلزم أن يكون من المختارة أعلاه.</div>
             </div>
             <div class="row" style="margin-top:14px"><button class="btn primary" id="slSave">حفظ</button></div>
-            <div class="fhint">اللاعب لا يتخطّى مرحلة ولا يعود لمرحلة أنهاها. الخسارة تُعيد المرحلة نفسها وتكلّف قلباً؛ الفوز يردّ القلب. رفع «عدد المراحل» يفتح المزيد فوراً لمن بلغ النهاية.</div>
+            <div class="fhint">اللاعب لا يتخطّى مرحلة ولا يعود لمرحلة أنهاها. الخسارة تُعيد المرحلة نفسها وتكلّف محاولة؛ الفوز يردّها. رفع «عدد المراحل» يفتح المزيد فوراً لمن بلغ النهاية.</div>
           </div>
           <div class="card w12">
             <div class="hd"><h3>🗂️ التصنيفات</h3><span class="pill">متاح = يُلعب · قريباً = مقفل · مخفي = لا يظهر</span></div>
@@ -828,6 +843,8 @@ $("#tq").addEventListener("keydown",e=>{if(e.key==="Enter"){ go("players"); $("#
 $("#chatRefresh").addEventListener("click",()=>loadChat());
 $("#maintSave").addEventListener("click",saveMaintenance);
 $("#adSave").addEventListener("click",saveAds);
+$("#noticeSend").addEventListener("click",sendNotice);
+$("#noticeCancel").addEventListener("click",cancelNotice);
 $("#mcSave").addEventListener("click",saveMatch);
 $("#slSave").addEventListener("click",saveLadder);
 $("#bcSend").addEventListener("click",broadcast);
@@ -1410,6 +1427,15 @@ async function loadControl(){
     showMaintLeft(v);
   }catch(e){}
   try{
+    const nt=await sb.from("app_config").select("value").eq("key","maintenance").single();
+    const n=(((nt.data&&nt.data.value)||{}).notice)||{};
+    $("#noticeMsg").value=n.message||"";
+    const left=n.closes_at ? Math.round((new Date(n.closes_at)-new Date())/60000) : null;
+    $("#noticePill").textContent = (left!==null && left>0) ? ("نشط · "+left+" دقيقة") : "لا يوجد";
+    $("#noticeLeft").textContent = (left!==null && left>0)
+      ? "التطبيق يغلق نفسه بعد "+left+" دقيقة تقريباً." : "";
+  }catch(e){}
+  try{
     const a=await sb.from("app_config").select("value").eq("key","ads").single();
     $("#adEvery").value=((a.data&&a.data.value)||{}).interstitial_every ?? 3;
   }catch(e){ $("#adEvery").value=3; }
@@ -1507,6 +1533,29 @@ function syncSoloDefault(keep){
 }
 // دورية الإعلان البيني. تُكتب بـ jsonb_set لا باستبدال الكائن، فلا تمحو
 // مفاتيح إعلانات أخرى تُضاف مستقبلاً — وهو الخطأ الذي وقع في حفظ الصيانة.
+// تنبيه الإغلاق: يُكتب داخل مفتاح الصيانة بدمج لا باستبدال، فلا يمحو الرسالة
+// ولا المؤقّت ولا حالة التشغيل.
+async function writeNotice(notice){
+  const cur=await sb.from("app_config").select("value").eq("key","maintenance").single();
+  const v=Object.assign({},(cur.data&&cur.data.value)||{});
+  if(notice===null) delete v.notice; else v.notice=notice;
+  const {error}=await sb.from("app_config").update({value:v}).eq("key","maintenance");
+  if(error) throw error;
+}
+async function sendNotice(){
+  const mins=parseInt($("#noticeMins").value,10);
+  if(!(mins>=1&&mins<=120)){ toast("المهلة يجب أن تكون بين 1 و120 دقيقة","err"); return; }
+  const msg=($("#noticeMsg").value||"").trim();
+  if(!msg){ toast("اكتب العبارة التي يراها اللاعبون","err"); return; }
+  if(!confirm("سيظهر التنبيه لكل من يلعب الآن، ويغلق التطبيق نفسه بعد "+mins+" دقيقة. متابعة؟")) return;
+  const closes=new Date(Date.now()+mins*60000).toISOString();
+  await act(()=>writeNotice({message:msg, closes_at:closes}),
+            "أُرسل التنبيه", loadControl);
+}
+async function cancelNotice(){
+  await act(()=>writeNotice(null), "أُلغي التنبيه — عاد اللاعبون للّعب", loadControl);
+}
+
 async function saveAds(){
   const n=parseInt($("#adEvery").value,10);
   if(!(n>=1&&n<=20)){ toast("الرقم يجب أن يكون بين 1 و20","err"); return; }
