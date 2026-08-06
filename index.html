@@ -1251,7 +1251,17 @@ async function searchPlayers(){
 }
 window._reopenPlayer=null;
 async function openPlayer(id){
-  let p; try{ p=await rpc("admin_player_profile",{p_id:id}); }catch(e){ toast("تعذّر فتح الملف","err"); return; }
+  // الملف وموقع اللاعب على سلّم التحدي الفردي يُطلبان **معاً** لا واحداً بعد
+  // الآخر: القاعدة في سيول، وكل رحلة ذهاب وإياب تكلّف نحو 0.4 ثانية يقضيها
+  // الفاتح أمام نافذة فارغة. والسلّم يسقط وحده إن تعذّر — ملفٌّ بلا سطر واحد
+  // خيرٌ من ملفٍّ لا يُفتح.
+  let p, ladder=null;
+  try{
+    [p, ladder] = await Promise.all([
+      rpc("admin_player_profile",{p_id:id}),
+      rpc("admin_solo_progress",{p_id:id}).catch(()=>null),
+    ]);
+  }catch(e){ toast("تعذّر فتح الملف","err"); return; }
   if(!p) return;
   window._reopenPlayer=()=>openPlayer(id);
   const cats=(p.categories||[]).map(c=>{
@@ -1273,12 +1283,18 @@ async function openPlayer(id){
         : `<button class="btn gold" onclick="pAct('grant','${p.id}')">👑 منح Premium</button>`}
       <button class="btn" onclick="pAct('coins','${p.id}')">🪙 تعديل العملات</button>
         <button class="btn" onclick="pAct('xp','${p.id}',${p.xp||0})">⭐️ تعديل الخبرة</button>
+      ${ladder&&ladder.can_move
+        ? `<button class="btn" onclick="pAct('stage','${p.id}',${ladder.current_stage||1})">🏔️ نقل إلى مرحلة</button>`
+        : ""}
       <button class="btn primary" onclick="pAct('message','${p.id}')">📩 مراسلة</button>
     </div>`;
   showModal(`👤 ${esc(p.username)} <span style="color:var(--dim);font-size:12px">${esc(p.player_code||"")}</span>`,`
     <div class="kv">
       ${kv("الحالة الآن",on?`<span style="color:var(--green)">🟢 ${ACT_AR[p.current_activity]||"متصل"}</span>`:`<span style="color:var(--dim)">🕓 آخر ظهور ${p.last_active?timeAgo(p.last_active):"—"}</span>`)}
       ${kv("المستوى",esc(p.level||"—"))}${kv("XP",fmt(p.xp))}${kv("العملات",fmt(p.coins))}
+      ${ladder?kv("مرحلة التحدي الفردي",ladder.started
+          ? `${fmt(ladder.current_stage)} <span style="color:var(--dim);font-size:11px">من ${fmt(ladder.total_stages)} · أعلى ما بلغ ${fmt(ladder.highest_stage)}</span>`
+          : '<span style="color:var(--dim)">لم يبدأ بعد</span>'):""}
       ${kv("المباريات",fmt(p.total_matches))}${kv("الفوز",`${fmt(p.wins)} (${wr}%)`)}${kv("الخسارة",fmt(p.losses))}
       ${kv("أطول سلسلة فوز",fmt(p.longest_win_streak))}${kv("سلسلة الأيام",fmt(p.streak_count))}
       ${kv("الخصوصية",p.privacy==="public"?"عام":"مخفي")}${kv("الدور",esc(p.role||"user"))}
@@ -1304,7 +1320,53 @@ async function pAct(kind,id,extra){
       act(()=>rpc("admin_set_premium",{p_id:id,p_on:false}),"تم إلغاء Premium",refresh); }
   else if(kind==="coins"){ coinsDialog(id,refresh); }
   else if(kind==="xp"){ xpDialog(id,extra,refresh); }
+  else if(kind==="stage"){ stageDialog(id,extra,refresh); }
   else if(kind==="message"){ messageDialog(id); }
+}
+
+// Move a player to any stage of the solo ladder.
+//
+// The ladder has no shortcuts BY DESIGN — no skipping, no going back, and only
+// a win advances you. That is right for a player and useless for testing:
+// seeing «التحدي الكبير» meant winning the nine stages in front of it, and
+// seeing it TWICE was impossible, because winning moves you off it.
+//
+// Admin only, and refused server-side for anyone else. The button is not even
+// drawn for a moderator — the profile read says whether the caller may move
+// stages, so nobody is offered a door that is locked to them.
+function stageDialog(id,current,after){
+  const cur=current||1;
+  const ov=document.createElement("div"); ov.className="ov";
+  ov.innerHTML=`<div class="modal sm"><div class="mh"><h3>🏔️ نقل إلى مرحلة</h3><button class="x">✕</button></div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">مرحلته الآن: <b style="color:var(--gold)">${fmt(cur)}</b></div>
+    <label class="flbl">المرحلة الجديدة</label>
+    <input class="fin num" id="stgVal" type="number" min="1" value="${cur}" style="text-align:center">
+    <div style="font-size:12px;color:var(--dim);margin-top:8px;line-height:1.6;">
+      يراها اللاعب فوراً دون إغلاق التطبيق. و«أعلى مرحلة بلغها» لا تتغيّر —
+      هي سجلّ ما أنجزه فعلاً، فالنقل لا يمحوه ولا يُضيف إليه.<br>
+      وكل مرحلة يقبل رقمها القسمة على 10 هي «التحدي الكبير» 🏔️.</div>
+    <div class="row" style="margin-top:14px;"><button class="btn primary" id="stgOk">نقل</button></div></div>`;
+  const close=()=>ov.remove(); ov.querySelector(".x").onclick=close; ov.onclick=e=>{if(e.target===ov)close();};
+  ov.querySelector("#stgOk").onclick=async()=>{
+    const n=parseInt(ov.querySelector("#stgVal").value,10);
+    if(isNaN(n)||n<1){toast("أدخل رقم مرحلة صحيحاً","err");return;}
+    if(n===cur){toast("المرحلة لم تتغيّر","err");return;}
+    // Moving a player BACKWARDS takes away stages they actually beat, as far as
+    // they can see. That deserves the red confirmation, not a quiet apply.
+    if(!await confirmDialog("نقل إلى مرحلة",
+      `سينتقل اللاعب من المرحلة <b>${fmt(cur)}</b> إلى <b>${fmt(n)}</b>` +
+      (n%10===0?` — وهي <b>التحدي الكبير</b> 🏔️`:"") + `. متابعة؟`, n<cur)) return;
+    close();
+    act(async()=>{
+      const r=await rpc("admin_set_solo_stage",{p_id:id,p_stage:n});
+      // The server owns the ladder's bounds and answers with them; repeating
+      // the limit here would be a second copy free to drift from the first.
+      if(r&&r.status==="bad_stage") throw new Error(`المرحلة خارج السلّم — بين 1 و ${fmt(r.total)}`);
+      if(r&&r.status==="no_player") throw new Error("اللاعب غير موجود");
+      return r;
+    },"تم نقل اللاعب",after);};
+  document.body.appendChild(ov);
+  setTimeout(()=>{const f=ov.querySelector("#stgVal"); f.focus(); f.select();},50);
 }
 // Set XP to an exact figure.
 //
@@ -1887,7 +1949,7 @@ async function loadSuspicious(){
 }
 
 // ---- staff management + audit trail (2026-07-25) ----
-const AUDIT_AR={set_banned:"حظر/فك حظر الحساب",grant_coins:"منح عملات",set_premium:"تعديل Premium",set_role:"تغيير صلاحية",chat_mute:"كتم من الدردشة",chat_ban:"حظر من الدردشة",chat_unban:"فك حظر الدردشة",chat_delete:"حذف رسالة"};
+const AUDIT_AR={set_banned:"حظر/فك حظر الحساب",grant_coins:"منح عملات",set_premium:"تعديل Premium",set_role:"تغيير صلاحية",chat_mute:"كتم من الدردشة",chat_ban:"حظر من الدردشة",chat_unban:"فك حظر الدردشة",chat_delete:"حذف رسالة",set_solo_stage:"نقل بين مراحل التحدي الفردي"};
 let MY_ROLE=null;
 async function loadStaff(){
   const box=$("#staffList"), sel=$("#auditActor");
@@ -1939,6 +2001,7 @@ async function loadAudit(){
     if(r.action==="set_banned") extra=d.banned?" (حظر ⛔)":" (فك الحظر ✅)";
     if(r.action==="set_premium") extra=d.on?" (تفعيل 👑)":" (إيقاف)";
     if(r.action==="set_role") extra=` (${d.from==="moderator"?"مشرف":"لاعب"} ← ${d.to==="moderator"?"مشرف":"لاعب"})`;
+    if(r.action==="set_solo_stage") extra=` (${fmt(d.from)} ← ${fmt(d.to)})`;
     return `<div style="display:flex;gap:10px;padding:8px 6px;border-bottom:1px solid var(--line);font-size:12.5px;align-items:center;flex-wrap:wrap;">
       <span style="color:var(--dim);min-width:58px;">${timeAgo(r.created_at)}</span>
       <b>${esc(r.actor_name||"؟")}</b>
