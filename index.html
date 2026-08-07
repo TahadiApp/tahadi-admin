@@ -754,6 +754,7 @@
                 سجلٌّ دائم — لا يُمحى ولا يُختصر. تسأل آبل عن كل طلب استرداد قبل أن تقرّر،
                 ويُرسَل لها ما استُهلك خلال <b>12 ساعة</b>؛ وما تراه هنا هو ما أرسلناه وما قرّرت.
               </div>
+              <div id="moFlags" class="grid" style="margin-bottom:14px"></div>
               <div id="moList"><div class="empty">اضغط «تحديث»</div></div>
             </div>
           </div>
@@ -2013,7 +2014,23 @@ const REFUND_AR={
 // غالباً رفضته بعد أن قلنا «لا نفضّل الاسترداد» ومعه رقم ما استُهلك.
 const PREF_AR={DECLINE:"طلبنا الرفض",GRANT_FULL:"لم نعترض",GRANT_PRORATED:"اقترحنا جزئياً"};
 
+// العدّ الكليّ — لا يتبع مرشّح المدة عمداً: «كم حساباً موسوماً الآن؟» سؤالٌ
+// عن الحاضر كلّه، ورقمٌ يبدو شاملاً وهو محدود بالمرشّح أسوأ من غيابه.
+async function loadFlagCounts(){
+  const box=$("#moFlags"); if(!box) return;
+  let c; try{ c=await rpc("admin_refund_flag_counts"); }catch(e){ box.innerHTML=""; return; }
+  const tile=(v,label,color)=>`<div class="w3"><div class="stat">
+    <div class="v num"${color?` style="color:${color}"`:""}>${fmt(v)}</div>
+    <div class="l">${label}</div></div></div>`;
+  box.innerHTML =
+    tile(c.internal||0,"⚠️ موسوم داخلياً","var(--amber)")+
+    tile(c.public||0,"⚠️ موسوم علناً","var(--red)")+
+    tile(c.in_debt||0,"حسابات عليها دَين")+
+    tile(c.debt_total||0,"مجموع الدَّين 🪙");
+}
+
 async function loadMoney(){
+  loadFlagCounts();
   const box=$("#moList");
   const days=parseInt($("#moDays").value||"0",10);
   const q=($("#moQ").value||"").trim();
@@ -2031,8 +2048,11 @@ async function loadMoney(){
     const what=r.kind==="coins"
       ? `🪙 ${fmt(r.coins)} عملة · ${esc(r.product||"")}`
       : `👑 اشتراك ${r.plan==="yearly"?"سنوي":"شهري"}`;
+    // الوسم الداخلي إنذارٌ مبكر لا عقوبة، فله شارة هادئة لا حمراء — والمشرف
+    // يميّز الحالتين من نظرة بدل أن يستنتج إحداهما من آثارها.
     const marks=[
-      r.flagged_public ?'<span class="badge r">⚠️ موسوم علناً</span>':"",
+      r.flagged_public ?'<span class="badge r">⚠️ موسوم علناً</span>'
+        : r.flagged_internal?'<span class="badge">⚠️ موسوم داخلياً</span>':"",
       r.purchase_banned?'<span class="badge r">شراء موقوف</span>':"",
       r.transfer_banned?'<span class="badge">تحويل موقوف</span>':"",
       r.debt>0         ?`<span class="badge">دَين ${fmt(r.debt)}</span>`:""
