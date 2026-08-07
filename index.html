@@ -1390,16 +1390,7 @@ async function pAct(kind,id,extra){
   else if(kind==="coins"){ coinsDialog(id,refresh); }
   else if(kind==="xp"){ xpDialog(id,extra,refresh); }
   else if(kind==="stage"){ stageDialog(id,extra,refresh); }
-  // تبرئةٌ للاعب لا لمعاملة: ترفع ما عليه هو وتردّ ما سُحب منه، **ولا تمسّ
-  // عقوبة غيره** — فمن استقبل من محتالٍ قد يكون بريئاً، وبراءته لا تعني براءة
-  // من حوّل إليه.
-  else if(kind==="clearRefund"){
-    if(await confirmDialog("رفع الوسم والقيود",
-        "سيُرفع الوسم عن هذا اللاعب، ويُعاد ما خُصم منه، ويُشطب دَينه، وتُرفع "+
-        "قيود التحويل والشراء والدردشة والصداقة.\n\n"+
-        "ولن تُمَسّ عقوبة أي لاعب آخر. ويبقى الشراء والاسترداد في السجلّ."))
-      act(()=>rpc("admin_clear_player_refunds",{p_player:id}),"رُفع الوسم والقيود",refresh);
-  }
+  else if(kind==="clearRefund"){ clearRefundDialog(id,refresh); }
   else if(kind==="message"){ messageDialog(id); }
 }
 
@@ -1413,6 +1404,35 @@ async function pAct(kind,id,extra){
 // Admin only, and refused server-side for anyone else. The button is not even
 // drawn for a moderator — the profile read says whether the caller may move
 // stages, so nobody is offered a door that is locked to them.
+// رفع القيود وإعادة ما خُصم **قراران لا واحد** (اعتراض المستخدم 2026-08-08):
+// الأول حكمٌ على العقوبة، والثاني حكمٌ على الخصم نفسه. وأكثرهما وقوعاً الأول —
+// لاعبٌ استردّ ماله فعلاً وأنفق عملاته، فالخصم حقّ، ثم يُرفع القيد لسببٍ آخر.
+// فلا يُدمجان في زرّ واحد، والافتراض هو الأحفظ: القيود تُرفع والخصم يبقى.
+function clearRefundDialog(id,after){
+  const ov=document.createElement("div"); ov.className="ov";
+  ov.innerHTML=`<div class="modal sm"><div class="mh"><h3>🧹 رفع الوسم والقيود</h3><button class="x">✕</button></div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.8;margin-bottom:6px;">
+      يُرفع الوسم عن هذا اللاعب، وتُرفع قيود التحويل والشراء والدردشة والصداقة.<br>
+      <b style="color:var(--text)">ولن تُمَسّ عقوبة أي لاعب آخر</b> — فمن استقبل من
+      محتالٍ قد يكون بريئاً، وبراءته لا تعني براءة من حوّل إليه.<br>
+      ويبقى الشراء والاسترداد في السجلّ.
+    </div>
+    <div style="font-size:12px;color:var(--dim);line-height:1.7;margin-bottom:14px;">
+      والسؤال الباقي: هل كان <b>الخصم</b> نفسه صحيحاً؟
+    </div>
+    <div class="row" style="flex-direction:column;gap:8px;align-items:stretch">
+      <button class="btn primary" id="crKeep">رفع القيود فقط · ويبقى ما خُصم</button>
+      <button class="btn" id="crRefund">رفع القيود وإعادة ما خُصم وشطب الدَّين</button>
+    </div></div>`;
+  const close=()=>ov.remove(); ov.querySelector(".x").onclick=close; ov.onclick=e=>{if(e.target===ov)close();};
+  const run=ret=>{ close(); act(()=>rpc("admin_clear_player_refunds",
+      {p_player:id,p_return_coins:ret}),
+      ret?"رُفعت القيود وأُعيد ما خُصم":"رُفعت القيود",after); };
+  ov.querySelector("#crKeep").onclick=()=>run(false);
+  ov.querySelector("#crRefund").onclick=()=>run(true);
+  document.body.appendChild(ov);
+}
+
 function stageDialog(id,current,after){
   const cur=current||1;
   const ov=document.createElement("div"); ov.className="ov";
