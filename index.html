@@ -1339,10 +1339,23 @@ async function openPlayer(id){
         : ""}
       <button class="btn primary" onclick="pAct('message','${p.id}')">📩 مراسلة</button>
     </div>`;
-  showModal(`👤 ${esc(p.username)} <span style="color:var(--dim);font-size:12px">${esc(p.player_code||"")}</span>`,`
+  // الوسم بجانب الاسم مباشرةً، **ومعه درجته**: الأولى إنذارٌ داخلي لا يراه
+  // اللاعبون، والثانية علانيةٌ ومنعُ شراءٍ وحظرُ دردشة. فبطاقةٌ تقول «موسوم»
+  // بلا درجة تترك المشرف يفتح سجلّ الاسترداد ليعرف أيّهما (طلب المستخدم
+  // 2026-08-08).
+  const flag = p.refund_public
+    ? `<span class="badge r" style="margin-right:6px">⚠️ وسم ثانٍ · علني</span>`
+    : p.refund_flagged
+      ? `<span class="badge" style="margin-right:6px">⚠️ وسم أول · داخلي</span>`
+      : "";
+  showModal(`👤 ${esc(p.username)} <span style="color:var(--dim);font-size:12px">${esc(p.player_code||"")}</span>${flag}`,`
     <div class="kv">
       ${kv("الحالة الآن",on?`<span style="color:var(--green)">🟢 ${ACT_AR[p.current_activity]||"متصل"}</span>`:`<span style="color:var(--dim)">🕓 آخر ظهور ${p.last_active?timeAgo(p.last_active):"—"}</span>`)}
-      ${kv("المستوى",esc(p.level||"—"))}${kv("XP",fmt(p.xp))}${kv("العملات",fmt(p.coins))}
+      ${kv("المستوى",esc(p.level||"—"))}${kv("XP",fmt(p.xp))}${kv("العملات",
+        // «0» وحدها تكذب على من عليه دَين: رصيده صفر لكنه مدين، وكل ما يكسبه
+        // يذهب للسداد. فالرقم يُذكر بجانبه لا في بطاقة جديدة.
+        fmt(p.coins)+(p.coin_debt>0
+          ? ` <span style="color:var(--red);font-size:11px">· دَين ${fmt(p.coin_debt)}</span>` : ""))}
       ${ladder?kv("مرحلة التحدي الفردي",ladder.started
           ? `${fmt(ladder.current_stage)} <span style="color:var(--dim);font-size:11px">من ${fmt(ladder.total_stages)} · أعلى ما بلغ ${fmt(ladder.highest_stage)}</span>`
           : '<span style="color:var(--dim)">لم يبدأ بعد</span>'):""}
