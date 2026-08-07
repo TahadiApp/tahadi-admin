@@ -747,6 +747,7 @@
                     <option value="0" selected>كل الفترة</option>
                   </select>
                   <button class="btn sm" id="moRefresh">↻ تحديث</button>
+                  <button class="btn sm" id="moPing">🔌 افحص الاتصال بآبل</button>
                 </div>
               </div>
               <div class="fhint" style="margin-bottom:12px">
@@ -889,6 +890,7 @@ $("#susDays").addEventListener("change",loadSuspicious);
 $("#moRefresh").addEventListener("click",loadMoney);
 $("#moDays").addEventListener("change",loadMoney);
 $("#moQ").addEventListener("keydown",e=>{if(e.key==="Enter") loadMoney();});
+$("#moPing").addEventListener("click",pingApple);
 
 // ---- view switching ----
 const nav=$("#nav");
@@ -2060,6 +2062,31 @@ async function loadMoney(){
       <div>${undo}</div>
     </div>`;
   }).join("");
+}
+
+// آبل ترسل إشعاراً تجريبياً بطلبٍ منّا ثم تخبرنا بم أجاب خادمنا. وهذا الشيء
+// الوحيد في القناة الذي لا يمكن التحقق منه من طرفنا وحدنا — والفشل فيه صامت:
+// لا يظهر إلا يوم استرداد حقيقي لا يصلنا خبره.
+async function pingApple(){
+  const b=$("#moPing"); const was=b.textContent;
+  b.disabled=true; b.textContent="جارٍ الفحص…";
+  try{
+    const {data,error}=await sb.functions.invoke("apple-selftest",{body:{}});
+    if(error) throw error;
+    const rows=(data&&data.checks)||[];
+    showModal("🔌 الاتصال بآبل", rows.map(c=>{
+      const name=c.env==="production"?"بيئة النشر":"بيئة الاختبار (TestFlight)";
+      if(c.ok) return `<div style="margin-bottom:10px"><b style="color:var(--green)">✅ ${name}</b>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:3px">أرسلت آبل إشعاراً واستقبله خادمنا.</div></div>`;
+      const why = c.stage==="request" ? "لم تقبل آبل الطلب أصلاً — تحقّق من مفتاح الشراء داخل التطبيق."
+                : c.stage==="pending" ? "أرسلت آبل ولم تُبلّغ بالنتيجة بعد. أعد الفحص بعد دقيقة."
+                : "أرسلت آبل ولم يصل خادمنا — تحقّق من العنوان في App Store Connect.";
+      return `<div style="margin-bottom:10px"><b style="color:var(--red)">❌ ${name}</b>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:3px">${esc(why)}</div>
+        <div style="font-size:11px;color:var(--dim);margin-top:3px">${esc(c.reason||c.result||"")}</div></div>`;
+    }).join(""));
+  }catch(e){ toast("تعذّر الفحص","err"); }
+  finally{ b.disabled=false; b.textContent=was; }
 }
 
 async function clearRefund(id){
