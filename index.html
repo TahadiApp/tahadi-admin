@@ -479,7 +479,7 @@
           </div></div>
           <div class="w3"><div class="stat"><div class="v num" id="m_xp" style="color:var(--primary-l)">—</div><div class="l">⚡ XP اليوم</div></div></div>
           <div class="w3"><div class="stat"><div class="v num" id="m_pur" style="color:var(--blue)">—</div><div class="l">🛒 مشتريات اليوم</div><div class="l2" id="m_pur7">—</div></div></div>
-          <div class="w3"><div class="stat"><div class="v num" id="m_rev" style="color:var(--green)">—</div><div class="l">💵 إيراد حقيقي (تراكمي)</div></div></div>
+          <div class="w3"><div class="stat"><div class="v num" id="m_rev" style="color:var(--green)">—</div><div class="l">💵 إيراد حقيقي (تراكمي)</div><div class="l" id="m_rev_note" style="opacity:.7"></div></div></div>
         </div>
 
         <div class="sectitle">🏆 المتصدرون <span class="ln"></span></div>
@@ -959,7 +959,10 @@ function renderSnapshot(s){
   const minted=(Number(s.coins_total)||0)+(Number(s.coins_spent)||0);
   setT("m_coins_note","إجمالي ما دخل الاقتصاد: "+fmt(minted)+" 🪙");
   setT("m_pur",fmt(s.purchases_today)); setT("m_pur7",fmt(s.purchases_7d)+" هذا الأسبوع");
-  setT("m_rev",fmt(s.revenue_real));
+  // Real revenue, per currency and never converted — see migration 0160. The
+  // old figure summed the COIN shop's `purchases` table and so could never
+  // count a single riyal of App Store sales.
+  loadRevenue();
   setT("m_reports",fmt(s.open_reports)); setT("m_banned",fmt(s.banned_count));
   setT("m_muted",fmt(s.muted_count)); setT("m_viol",fmt(s.violations_today));
   setT("m_q",fmt(s.questions_total)); setT("m_cats",fmt(s.categories_count)); setT("m_mtotal",fmt(s.matches_total));
@@ -1089,7 +1092,19 @@ async function loadLevels(){
     return `<div class="bar"><div class="br"><span>🎖️ ${esc(l.level)} <span style="color:var(--dim);font-size:10.5px">(${fmt(l.min_xp)}+ XP)</span></span><b class="num">${fmt(l.players)}</b></div><div class="tr"><div class="fl" style="width:${w}%;background:${cols[i%cols.length]}"></div></div></div>`;}).join("");
 }
 let eventsCache=[];
-const EV_ICON={signup:["✨","rgba(52,211,153,.2)"],match:["🏆","rgba(96,165,250,.2)"],purchase:["🛒","rgba(251,191,36,.2)"],report:["🚩","rgba(248,113,113,.2)"],transfer:["🤝","rgba(167,139,250,.22)"]};
+const EV_ICON={signup:["✨","rgba(52,211,153,.2)"],match:["🏆","rgba(96,165,250,.2)"],purchase:["🛒","rgba(251,191,36,.2)"],report:["🚩","rgba(248,113,113,.2)"],transfer:["🤝","rgba(167,139,250,.22)"],
+  // Money, in the colour money gets everywhere else on this dashboard.
+  coin_purchase:["💵","rgba(52,211,153,.24)"],subscription:["👑","rgba(251,191,36,.26)"]};
+async function loadRevenue(){
+  let rows=[];
+  try{ rows=await rpc("admin_revenue_by_currency"); }catch(e){ rows=[]; }
+  const el=$("#m_rev"); if(!el) return;
+  if(!rows||!rows.length){ el.textContent="—"; setT("m_rev_note","لا مبيعات بعد"); return; }
+  // One line per currency. Two currencies added together is not a number.
+  el.innerHTML=rows.map(r=>`${fmt(Number(r.total).toFixed(2))} <span style="font-size:13px;color:var(--dim)">${esc(r.currency)}</span>`).join(" · ");
+  setT("m_rev_note", rows.reduce((n,r)=>n+Number(r.count||0),0)+" عملية");
+}
+
 async function loadEvents(){
   eventsCache=await rpc("admin_recent_events",{p_limit:14});
   $("#events").innerHTML=eventsCache.length?eventsCache.map((e,i)=>{const[emoji,bg]=EV_ICON[e.type]||["•","rgba(255,255,255,.1)"];
