@@ -402,6 +402,7 @@
     <a data-v="control" title="التحكم والصيانة">🎚️</a>
     <a data-v="broadcast" title="البث">📣</a>
     <a data-v="staff" title="المشرفون">🛡️</a>
+    <a data-v="money" title="المال والاسترداد">💵</a>
     <a data-v="security" title="رصد النشاطات المشبوهة">🕵️<span class="cnt hidden" id="susCnt">0</span></a>
     <div class="sp"></div>
     <div class="me" id="signout" title="تسجيل الخروج">👑</div>
@@ -730,6 +731,34 @@
       </section>
 
       <!-- ================= SECURITY / SUSPICIOUS ACTIVITY ================= -->
+      <!-- ================= MONEY & REFUNDS ================= -->
+      <section class="view" id="v-money">
+        <div class="grid">
+          <div class="w12">
+            <div class="card">
+              <div class="hd">
+                <h3>💵 المشتريات والاسترداد</h3>
+                <div class="row">
+                  <input class="fin" id="moQ" placeholder="اسم لاعب أو رمزه…" style="width:190px;padding:7px 10px;" autocomplete="off">
+                  <select class="fin" id="moDays" style="width:150px;padding:7px 10px;">
+                    <option value="7">آخر 7 أيام</option>
+                    <option value="30">آخر 30 يوماً</option>
+                    <option value="90">آخر 90 يوماً</option>
+                    <option value="0" selected>كل الفترة</option>
+                  </select>
+                  <button class="btn sm" id="moRefresh">↻ تحديث</button>
+                </div>
+              </div>
+              <div class="fhint" style="margin-bottom:12px">
+                سجلٌّ دائم — لا يُمحى ولا يُختصر. تسأل آبل عن كل طلب استرداد قبل أن تقرّر،
+                ويُرسَل لها ما استُهلك خلال <b>12 ساعة</b>؛ وما تراه هنا هو ما أرسلناه وما قرّرت.
+              </div>
+              <div id="moList"><div class="empty">اضغط «تحديث»</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="view" id="v-security">
         <div class="grid">
           <div class="w12">
@@ -788,7 +817,7 @@ const MODE_AR={online:"⚔️ المباشر",friends:"👫 الأصدقاء",ro
 const ACT_AR={solo:"🎯 الفردي",online:"⚔️ المباشر",friends:"👫 الأصدقاء",rooms:"👥 الغرف",room:"👥 الغرف",home:"🏠 الرئيسية",chat:"💬 الدردشة",leaderboard:"🏆 الترتيب",stats:"📊 الإحصائيات",profile:"👤 الحساب",shop:"🛒 المتجر",other:"• أخرى"};
 const ACT_COLOR={solo:"#60A5FA",online:"#A855F7",friends:"#34D399",rooms:"#F472B6",room:"#F472B6",home:"#867AA6",shop:"#FB923C",other:"#867AA6"};
 const MODES=[["online","⚔️ التحدي المباشر"],["solo","🎯 التحدي الفردي"],["friends","👫 تحدي الأصدقاء"],["rooms","👥 الغرف الجماعية"]];
-const SUB={overview:["نظرة عامة","كل مؤشرات التطبيق في مكان واحد"],players:["اللاعبون","بحث وتحكّم في الحسابات"],livechat:["الدردشة الحية","إشراف فوري على المحادثة"],content:["المحتوى","التصنيفات والبلاغات"],control:["التحكم والصيانة","الصيانة والتصنيفات والأوضاع"],broadcast:["البث","إشعارات وإعلانات"],staff:["المشرفون","الصلاحيات وسجل الإجراءات"],security:["رصد النشاطات المشبوهة","كشف آلي للغش والشذوذ"]};
+const SUB={overview:["نظرة عامة","كل مؤشرات التطبيق في مكان واحد"],players:["اللاعبون","بحث وتحكّم في الحسابات"],livechat:["الدردشة الحية","إشراف فوري على المحادثة"],content:["المحتوى","التصنيفات والبلاغات"],control:["التحكم والصيانة","الصيانة والتصنيفات والأوضاع"],broadcast:["البث","إشعارات وإعلانات"],staff:["المشرفون","الصلاحيات وسجل الإجراءات"],money:["المال والاسترداد","كل عملية شراء حقيقية ومصيرها"],security:["رصد النشاطات المشبوهة","كشف آلي للغش والشذوذ"]};
 const fmt=n=>(n==null?"—":Number(n).toLocaleString("en-US"));
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const kv=(k,v)=>`<div><div class="k">${k}</div><div class="val">${v}</div></div>`;
@@ -857,6 +886,9 @@ $("#auditRefresh").addEventListener("click",loadAudit);
 $("#auditActor").addEventListener("change",loadAudit);
 $("#susRefresh").addEventListener("click",loadSuspicious);
 $("#susDays").addEventListener("change",loadSuspicious);
+$("#moRefresh").addEventListener("click",loadMoney);
+$("#moDays").addEventListener("change",loadMoney);
+$("#moQ").addEventListener("keydown",e=>{if(e.key==="Enter") loadMoney();});
 
 // ---- view switching ----
 const nav=$("#nav");
@@ -870,6 +902,7 @@ function go(v){
   if(v==="control") loadControl();
   if(v==="broadcast"){ loadPushSettings(); loadAnnouncements(); }
   if(v==="staff"){ loadStaff(); loadAudit(); }
+  if(v==="money") loadMoney();
   if(v==="security") loadSuspicious();
 }
 nav.addEventListener("click",e=>{const a=e.target.closest("a"); if(a) go(a.dataset.v);});
@@ -1961,6 +1994,80 @@ async function loadSuspicious(){
       <div style="font-size:11px;color:var(--dim);white-space:nowrap">اضغط للملف ←</div>
     </div>`;
   }).join("");
+}
+
+// ---- money & refunds (2026-08-07) ----
+//
+// كل شراء بمال حقيقي بسطره، ومعه مصيره. وسببُ وجود القسم أن «الأحداث الحيّة»
+// تعرض الجديد وتنساه — وسؤال «هل استُرد هذا المبلغ؟» يُطرح بعد شهور.
+const REFUND_AR={
+  requested:{t:"طلب استرداد — بانتظار قرار آبل",c:"var(--amber,#e0a800)",ic:"⏳"},
+  granted  :{t:"ردّت آبل المبلغ",              c:"var(--red,#e05555)", ic:"❌"},
+  declined :{t:"رفضت آبل الطلب",               c:"var(--green)",       ic:"🛡️"},
+  reversed :{t:"عكست آبل الاسترداد",           c:"var(--green)",       ic:"↩️"},
+  cleared  :{t:"أُلغيت العقوبة يدوياً",         c:"var(--muted)",       ic:"🧹"}
+};
+// ما أخبرنا به آبل قبل قرارها. نُترجمه لأنه يفسّر النتيجة: من رفضت طلبه
+// غالباً رفضته بعد أن قلنا «لا نفضّل الاسترداد» ومعه رقم ما استُهلك.
+const PREF_AR={DECLINE:"طلبنا الرفض",GRANT_FULL:"لم نعترض",GRANT_PRORATED:"اقترحنا جزئياً"};
+
+async function loadMoney(){
+  const box=$("#moList");
+  const days=parseInt($("#moDays").value||"0",10);
+  const q=($("#moQ").value||"").trim();
+  box.innerHTML='<div class="empty">جارٍ التحميل…</div>';
+  const args={p_limit:300};
+  if(days>0) args.p_from=new Date(Date.now()-days*86400000).toISOString();
+  if(q) args.p_query=q;
+  let rows; try{ rows=await rpc("admin_money",args); }
+  catch(e){ box.innerHTML='<div class="empty">تعذّر التحميل</div>'; return; }
+  if(!rows||!rows.length){ box.innerHTML='<div class="empty big">لا مشتريات في هذه الفترة</div>'; return; }
+
+  box.innerHTML=rows.map(r=>{
+    const st=r.refund_status?(REFUND_AR[r.refund_status]||{t:r.refund_status,c:"var(--muted)",ic:"•"}):null;
+    const money=(r.amount!=null)?`${fmt(r.amount)} ${esc(r.currency||"")}`:"—";
+    const what=r.kind==="coins"
+      ? `🪙 ${fmt(r.coins)} عملة · ${esc(r.product||"")}`
+      : `👑 اشتراك ${r.plan==="yearly"?"سنوي":"شهري"}`;
+    const marks=[
+      r.flagged_public ?'<span class="badge r">⚠️ موسوم علناً</span>':"",
+      r.purchase_banned?'<span class="badge r">شراء موقوف</span>':"",
+      r.transfer_banned?'<span class="badge">تحويل موقوف</span>':"",
+      r.debt>0         ?`<span class="badge">دَين ${fmt(r.debt)}</span>`:""
+    ].join(" ");
+    // زرّ الإلغاء يظهر فقط حيث توجد عقوبة قائمة فعلاً — زرٌّ لا يفعل شيئاً
+    // أسوأ من غيابه.
+    const undo=r.penalty_applied
+      ? `<button class="btn sm" onclick="clearRefund(${r.refund_id})">رفع العقوبة</button>` : "";
+    const line=st
+      ? `<div style="font-size:12px;color:${st.c};margin-top:5px">${st.ic} ${st.t}
+           ${r.our_preference?` · <span style="color:var(--dim)">${PREF_AR[r.our_preference]||esc(r.our_preference)}</span>`:""}
+           ${r.answered?"":' · <span style="color:var(--dim)">لم نُجب آبل</span>'}</div>` : "";
+    return `<div style="display:flex;gap:13px;align-items:flex-start;padding:14px;border-radius:16px;
+        background:var(--s1);margin-bottom:9px;border:1px solid var(--line)
+        ${st?`;border-right:4px solid ${st.c}`:""}">
+      <div style="font-size:20px;line-height:1">${r.kind==="coins"?"🪙":"👑"}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b style="font-size:13.5px;cursor:pointer" onclick="openPlayer('${r.player_id}')">${esc(r.player||"—")}</b>
+          <span style="font-size:11px;color:var(--dim)">${esc(r.code||"")}</span>
+          ${marks}
+        </div>
+        <div style="font-size:12.5px;color:var(--muted);margin-top:4px">${what} · <b style="color:var(--text)">${money}</b></div>
+        ${line}
+        <div style="font-size:11px;color:var(--dim);margin-top:5px">🕓 ${new Date(r.at).toLocaleString("en-GB")}</div>
+      </div>
+      <div>${undo}</div>
+    </div>`;
+  }).join("");
+}
+
+async function clearRefund(id){
+  if(!await confirmDialog("رفع العقوبة",
+      "سيُعاد ما خُصم، ويُشطب الدَّين، وتُرفع القيود عن المشتري وعمّن وصلته عملاته. "+
+      "ويبقى الشراء والاسترداد في السجلّ.")) return;
+  try{ await rpc("admin_clear_refund_penalty",{p_refund:id}); toast("رُفعت العقوبة","ok"); loadMoney(); }
+  catch(e){ toast("تعذّر التنفيذ","err"); }
 }
 
 // ---- staff management + audit trail (2026-07-25) ----
