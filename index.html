@@ -1338,6 +1338,11 @@ async function openPlayer(id){
         ? `<button class="btn" onclick="pAct('stage','${p.id}',${ladder.current_stage||1})">🏔️ نقل إلى مرحلة</button>`
         : ""}
       <button class="btn primary" onclick="pAct('message','${p.id}')">📩 مراسلة</button>
+      ${(p.refund_flagged||p.coin_debt>0)
+        // لا يُرسم إلا لمن عليه شيء: زرٌّ يظهر دائماً ولا يفعل شيئاً في أغلب
+        // الملفات يصير جزءاً من الأثاث، فلا يُرى يوم يُحتاج.
+        ? `<button class="btn success" onclick="pAct('clearRefund','${p.id}')">🧹 رفع الوسم والقيود</button>`
+        : ""}
     </div>`;
   // الوسم بجانب الاسم مباشرةً، **ومعه درجته**: الأولى إنذارٌ داخلي لا يراه
   // اللاعبون، والثانية علانيةٌ ومنعُ شراءٍ وحظرُ دردشة. فبطاقةٌ تقول «موسوم»
@@ -1385,6 +1390,16 @@ async function pAct(kind,id,extra){
   else if(kind==="coins"){ coinsDialog(id,refresh); }
   else if(kind==="xp"){ xpDialog(id,extra,refresh); }
   else if(kind==="stage"){ stageDialog(id,extra,refresh); }
+  // تبرئةٌ للاعب لا لمعاملة: ترفع ما عليه هو وتردّ ما سُحب منه، **ولا تمسّ
+  // عقوبة غيره** — فمن استقبل من محتالٍ قد يكون بريئاً، وبراءته لا تعني براءة
+  // من حوّل إليه.
+  else if(kind==="clearRefund"){
+    if(await confirmDialog("رفع الوسم والقيود",
+        "سيُرفع الوسم عن هذا اللاعب، ويُعاد ما خُصم منه، ويُشطب دَينه، وتُرفع "+
+        "قيود التحويل والشراء والدردشة والصداقة.\n\n"+
+        "ولن تُمَسّ عقوبة أي لاعب آخر. ويبقى الشراء والاسترداد في السجلّ."))
+      act(()=>rpc("admin_clear_player_refunds",{p_player:id}),"رُفع الوسم والقيود",refresh);
+  }
   else if(kind==="message"){ messageDialog(id); }
 }
 
