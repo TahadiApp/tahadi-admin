@@ -2032,14 +2032,34 @@ const PREF_AR={DECLINE:"طلبنا الرفض",GRANT_FULL:"لم نعترض",GRAN
 async function loadFlagCounts(){
   const box=$("#moFlags"); if(!box) return;
   let c; try{ c=await rpc("admin_refund_flag_counts"); }catch(e){ box.innerHTML=""; return; }
-  const tile=(v,label,color)=>`<div class="w3"><div class="stat">
-    <div class="v num"${color?` style="color:${color}"`:""}>${fmt(v)}</div>
-    <div class="l">${label}</div></div></div>`;
+  // البطاقة التي تعدّ لاعبين تُفتح عليهم. أما «مجموع الدَّين» فمبلغٌ لا مجموعة،
+  // فيبقى ساكناً — وبطاقةٌ تبدو قابلة للضغط ولا تفعل شيئاً أسوأ من ساكنة.
+  const tile=(v,label,color,kind)=>{
+    const open=kind&&v>0;
+    return `<div class="w3"><div class="stat"${open
+      ? ` onclick="openFlagged('${kind}')" style="cursor:pointer"` : ""}>
+      <div class="v num"${color?` style="color:${color}"`:""}>${fmt(v)}</div>
+      <div class="l">${label}${open?' <span style="color:var(--dim)">←</span>':""}</div>
+    </div></div>`;
+  };
   box.innerHTML =
-    tile(c.internal||0,"⚠️ موسوم داخلياً","var(--amber)")+
-    tile(c.public||0,"⚠️ موسوم علناً","var(--red)")+
-    tile(c.in_debt||0,"حسابات عليها دَين")+
+    tile(c.internal||0,"⚠️ موسوم داخلياً","var(--amber)","internal")+
+    tile(c.public||0,"⚠️ موسوم علناً","var(--red)","public")+
+    tile(c.in_debt||0,"حسابات عليها دَين",null,"debt")+
     tile(c.debt_total||0,"مجموع الدَّين 🪙");
+}
+
+const FLAG_LIST={
+  internal:["⚠️ موسومون داخلياً","لا أحد موسوم داخلياً."],
+  public:  ["⚠️ موسومون علناً","لا أحد موسوم علناً."],
+  debt:    ["🪙 حسابات عليها دَين","لا دَين على أحد."],
+};
+function openFlagged(kind){
+  const [title,empty]=FLAG_LIST[kind]||["لاعبون","لا أحد."];
+  openPlayerListModal(title, ()=>rpc("admin_flagged_players",{p_kind:kind}), empty,
+    p=>p.coin_debt>0
+      ? `<span class="ac" style="color:var(--red)">دَين ${fmt(p.coin_debt)}</span>`
+      : `<span class="ac" style="color:var(--dim)">وُسم ${p.flagged_at?timeAgo(p.flagged_at):"—"}</span>`);
 }
 
 async function loadMoney(){
