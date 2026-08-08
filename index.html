@@ -537,6 +537,25 @@
         <div class="grid">
           <div class="card w7"><div class="hd"><h3>📚 صحة المحتوى · الإجابات لكل تصنيف</h3><span class="pill" id="qTotal">—</span></div><div id="categories"></div></div>
           <div class="card w5"><div class="hd"><h3>🚩 بلاغات الأسئلة</h3><div class="row" id="repFilter"></div></div><div id="reports"></div></div>
+          <div class="card w12">
+            <div class="hd">
+              <h3>💬 بلاغات الرسائل المسيئة</h3>
+              <div class="row">
+                <select class="fin" id="mrStatus" style="width:150px;padding:7px 10px;">
+                  <option value="open" selected>المفتوحة</option>
+                  <option value="reviewed">التي روجعت</option>
+                  <option value="dismissed">المرفوضة</option>
+                  <option value="all">الكل</option>
+                </select>
+                <button class="btn sm" id="mrRefresh">↻ تحديث</button>
+              </div>
+            </div>
+            <div class="fhint" style="margin-bottom:12px">
+              نصّ الرسالة <b>مصوَّر لحظة الإبلاغ</b> — فحذفها أو تعديلها بعده لا يمحو ما أُبلغ عنه.
+              و«بلاغات على هذا اللاعب» يفرّق بين خصومة واحدة ونمطٍ متكرر.
+            </div>
+            <div id="mrList"><div class="empty">اضغط «تحديث»</div></div>
+          </div>
         </div>
       </section>
 
@@ -892,6 +911,8 @@ $("#moRefresh").addEventListener("click",loadMoney);
 $("#moDays").addEventListener("change",loadMoney);
 $("#moQ").addEventListener("keydown",e=>{if(e.key==="Enter") loadMoney();});
 $("#moPing").addEventListener("click",pingApple);
+$("#mrRefresh").addEventListener("click",loadMessageReports);
+$("#mrStatus").addEventListener("change",loadMessageReports);
 
 // ---- view switching ----
 const nav=$("#nav");
@@ -906,6 +927,7 @@ function go(v){
   if(v==="broadcast"){ loadPushSettings(); loadAnnouncements(); }
   if(v==="staff"){ loadStaff(); loadAudit(); }
   if(v==="money") loadMoney();
+  if(v==="content") loadMessageReports();
   if(v==="security") loadSuspicious();
 }
 nav.addEventListener("click",e=>{const a=e.target.closest("a"); if(a) go(a.dataset.v);});
@@ -1005,7 +1027,17 @@ function renderSnapshot(s){
   const maint=$("#m_maint");
   if(maint) maint.innerHTML = s.maintenance_on ? '<span class="pill a">مُفعّل ⚠️</span>' : '<span class="pill g">طبيعي ✓</span>';
   const mp=$("#maintPill"); if(mp){ mp.className="pill "+(s.maintenance_on?"a":"g"); mp.textContent=s.maintenance_on?"مُفعّل":"طبيعي"; }
-  const rc=$("#repCnt"); if(rc){ rc.textContent=fmt(s.open_reports); rc.classList.toggle("hidden",!(s.open_reports>0)); }
+  // العدّاد يجمع بلاغات الأسئلة وبلاغات الرسائل معاً: كلاهما ينتظر المشرف في
+  // نفس الشاشة، وعدّادٌ يذكر أحدهما يُخفي الآخر.
+  const rc=$("#repCnt");
+  if(rc){
+    rpc("admin_open_message_reports").then(m=>{
+      const n=(s.open_reports||0)+(m||0);
+      rc.textContent=fmt(n); rc.classList.toggle("hidden",!(n>0));
+    }).catch(()=>{
+      rc.textContent=fmt(s.open_reports); rc.classList.toggle("hidden",!(s.open_reports>0));
+    });
+  }
   setT("updated","آخر تحديث: "+new Date().toLocaleTimeString("ar-EG"));
 }
 
@@ -2045,6 +2077,51 @@ async function loadSuspicious(){
       <div style="font-size:11px;color:var(--dim);white-space:nowrap">اضغط للملف ←</div>
     </div>`;
   }).join("");
+}
+
+// ---- بلاغات الرسائل المسيئة (2026-08-08) ----
+const MR_SCOPE={public:"الدردشة العامة",private:"رسالة خاصة"};
+async function loadMessageReports(){
+  const box=$("#mrList"), st=$("#mrStatus").value;
+  box.innerHTML='<div class="empty">جارٍ التحميل…</div>';
+  let rows; try{ rows=await rpc("admin_message_reports",{p_status:st,p_limit:100}); }
+  catch(e){ box.innerHTML='<div class="empty">تعذّر التحميل</div>'; return; }
+  if(!rows||!rows.length){ box.innerHTML='<div class="empty big">✅ لا بلاغات هنا</div>'; return; }
+  box.innerHTML=rows.map(r=>{
+    // تكرار البلاغات على نفس اللاعب هو الفرق بين خصومة ونمط، فيُبرز.
+    const many=r.reported_total>1
+      ? `<span class="badge r">${fmt(r.reported_total)} بلاغات عليه</span>`:"";
+    const marks=[many,
+      r.reported_banned?'<span class="badge r">محظور</span>':"",
+      r.reported_chat_banned?'<span class="badge">دردشة محظورة</span>':""].join(" ");
+    const acts=r.status==="open"
+      ? `<button class="btn sm" onclick="mrResolve(${r.id},'reviewed')">✅ رُوجع</button>
+         <button class="btn sm" onclick="mrResolve(${r.id},'dismissed')">✕ رفض البلاغ</button>`
+      : `<button class="btn sm" onclick="mrResolve(${r.id},'open')">↩︎ إعادة فتحه</button>`;
+    return `<div style="padding:14px;border-radius:16px;background:var(--s1);margin-bottom:9px;
+        border:1px solid var(--line);border-right:4px solid ${r.status==="open"?"var(--red)":"var(--line2)"}">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <span class="badge">${MR_SCOPE[r.scope]||esc(r.scope)}</span>
+        <b style="cursor:pointer;font-size:13.5px" onclick="openPlayer('${r.reported_id}')">${esc(r.reported||"—")}</b>
+        <span style="font-size:11px;color:var(--dim)">${esc(r.reported_code||"")}</span>
+        ${marks}
+      </div>
+      <div style="background:var(--s2);border-radius:12px;padding:11px 13px;font-size:13px;line-height:1.8">
+        ${esc(r.content)}
+      </div>
+      <div style="font-size:11px;color:var(--dim);margin-top:8px">
+        🚩 أبلغ عنها <b style="color:var(--text)">${esc(r.reporter||"—")}</b> ${esc(r.reporter_code||"")}
+        ${r.reason?` · السبب: ${esc(r.reason)}`:""}
+        · 🕓 ${new Date(r.created_at).toLocaleString("en-GB")}
+      </div>
+      <div class="row" style="margin-top:10px">${acts}</div>
+    </div>`;
+  }).join("");
+}
+async function mrResolve(id,status){
+  try{ await rpc("admin_resolve_message_report",{p_id:id,p_status:status});
+    toast("تم","ok"); loadMessageReports(); }
+  catch(e){ toast("تعذّر التنفيذ","err"); }
 }
 
 // ---- money & refunds (2026-08-07) ----
