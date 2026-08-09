@@ -556,6 +556,23 @@
             </div>
             <div id="mrList"><div class="empty">اضغط «تحديث»</div></div>
           </div>
+          <div class="card w12">
+            <div class="hd">
+              <h3>🎨 الملصقات</h3>
+              <div class="row">
+                <button class="btn sm primary" id="stkNew">+ ملصق جديد</button>
+                <button class="btn sm" id="stkRefresh">↻ تحديث</button>
+              </div>
+            </div>
+            <div class="fhint" style="margin-bottom:12px">
+              <b>العبارة والإيموجي</b> يظهران للاعبين فور حفظهما — بلا بناءٍ ولا مراجعة آبل.
+              أما <b>الرسم</b> فصورته تُشحن داخل التطبيق، فلا تُفعّله قبل أن ينزل بناءٌ يحمله،
+              وإلّا بقي مخفيّاً عن الجميع. والمعرّف لا يُعدَّل بعد إنشائه: هو ما يعبر الشبكة
+              بين اللاعبين وما تُربط به الملكية. <b>ولا حذف — بل إيقاف</b>: حذف ملصقٍ يمحو
+              معه ملكيّة كل من دفع ثمنه.
+            </div>
+            <div id="stkList"><div class="empty">اضغط «تحديث»</div></div>
+          </div>
         </div>
       </section>
 
@@ -879,6 +896,154 @@ function showModal(title,body,cls){
 }
 function closeModals(){ document.querySelectorAll(".ov").forEach(o=>o.remove()); }
 
+// ================= الملصقات =================
+// الفهرس في القاعدة، والرسوم في البناء. فما يُضاف هنا من عبارةٍ أو إيموجي يصل
+// اللاعبين فوراً، وما كان رسماً ينتظر بناءً يحمل صورته.
+const STK_KINDS={emoji:"إيموجي",phrase:"عبارة",art:"رسم"};
+let stickersCache=[];
+
+async function loadStickers(){
+  const box=$("#stkList"); box.innerHTML=`<div class="empty">جارٍ التحميل…</div>`;
+  const{data,error}=await sb.from("reaction_stickers")
+    .select("code,kind,content,label,price,is_free,is_pinned,is_active,sort_order")
+    .order("sort_order").order("code");
+  if(error){ box.innerHTML=`<div class="empty">تعذّر التحميل</div>`; return; }
+  stickersCache=data||[];
+  renderStickers();
+}
+
+// معاينة الملصق كما يراه اللاعب — والرسم لا يُعرض هنا لأن صورته في التطبيق
+// لا على الخادم، فيُكتفى بوسمه.
+function stkPreview(x){
+  if(x.kind==="emoji") return `<span style="font-size:22px">${esc(x.content||"")}</span>`;
+  if(x.kind==="phrase") return `<span style="font-size:12.5px;font-weight:800">${esc(x.content||"")}</span>`;
+  return `<span class="pill" style="font-size:11px">🖼 رسم</span>`;
+}
+
+function renderStickers(){
+  const box=$("#stkList");
+  if(!stickersCache.length){ box.innerHTML=`<div class="empty">لا ملصقات بعد</div>`; return; }
+  box.innerHTML=stickersCache.map(x=>{
+    const off=x.is_active!==true;
+    return `<div class="ctrow" style="align-items:center;gap:10px;${off?"opacity:.55":""}">
+      <div style="width:92px;text-align:center">${stkPreview(x)}</div>
+      <div style="flex:1;min-width:130px">
+        <div style="font-size:12px;color:var(--muted)">${esc(x.code)} · ${STK_KINDS[x.kind]||x.kind}
+          ${x.is_pinned?' · <b>ثابت</b>':""}${x.is_free?" · مجاني":""}</div>
+        <input class="fin" data-stk="label" data-code="${esc(x.code)}" value="${esc(x.label||"")}"
+               style="padding:7px 10px;margin-top:4px" placeholder="الاسم">
+      </div>
+      <div style="width:96px">
+        <label class="flbl">السعر</label>
+        <input class="fin" type="number" min="0" data-stk="price" data-code="${esc(x.code)}"
+               value="${x.price??0}" ${x.is_free?"disabled":""} style="padding:7px 10px">
+      </div>
+      <div style="width:84px">
+        <label class="flbl">الترتيب</label>
+        <input class="fin" type="number" data-stk="sort" data-code="${esc(x.code)}"
+               value="${x.sort_order??100}" style="padding:7px 10px">
+      </div>
+      <div class="seg">
+        <button class="${!off?'on-g':''}" onclick="setStickerActive('${esc(x.code)}',true)">مفعّل</button>
+        <button class="${off?'on-a':''}" onclick="setStickerActive('${esc(x.code)}',false)">موقوف</button>
+      </div>
+      <button class="btn sm primary" onclick="saveSticker('${esc(x.code)}')">حفظ</button>
+    </div>`;}).join("");
+}
+
+const stkField=(code,f)=>document.querySelector(`[data-stk="${f}"][data-code="${code}"]`);
+
+async function saveSticker(code){
+  const label=(stkField(code,"label")||{}).value;
+  const priceEl=stkField(code,"price"), sortEl=stkField(code,"sort");
+  const patch={label:(label||"").trim(), sort_order:parseInt(sortEl.value,10)||0};
+  if(!priceEl.disabled) patch.price=Math.max(0,parseInt(priceEl.value,10)||0);
+  if(!patch.label){ toast("الاسم لا يكون فارغاً","err"); return; }
+  act(async()=>{
+    const{error}=await sb.from("reaction_stickers").update(patch).eq("code",code);
+    if(error) throw error;
+  },"حُفظ الملصق",loadStickers);
+}
+
+// الإيقاف بديل الحذف: الملصق الموقوف يسقط من المتجر ومن صناديق اللاعبين، وتبقى
+// ملكية من دفع ثمنه — فلو أُعيد تفعيله عاد إليه بلا شراءٍ ثانٍ.
+async function setStickerActive(code,on){
+  act(async()=>{
+    const{error}=await sb.from("reaction_stickers").update({is_active:on}).eq("code",code);
+    if(error) throw error;
+  }, on?"فُعّل الملصق":"أُوقف الملصق", loadStickers);
+}
+
+function newStickerModal(){
+  const ov=showModal("ملصق جديد",`
+    <div class="row" style="gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:150px">
+        <label class="flbl">المعرّف (إنجليزي، لا يُعدَّل لاحقاً)</label>
+        <input class="fin" id="nsCode" placeholder="mashallah" autocomplete="off">
+      </div>
+      <div style="width:150px">
+        <label class="flbl">النوع</label>
+        <select class="fin" id="nsKind">
+          <option value="phrase">عبارة</option>
+          <option value="emoji">إيموجي</option>
+          <option value="art">رسم</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:10px" id="nsContentWrap">
+      <label class="flbl" id="nsContentLbl">العبارة كما تظهر للاعب</label>
+      <input class="fin" id="nsContent" placeholder="ما شاء الله" autocomplete="off">
+    </div>
+    <div class="row" style="gap:10px;margin-top:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:150px">
+        <label class="flbl">الاسم في المتجر</label>
+        <input class="fin" id="nsLabel" placeholder="ما شاء الله" autocomplete="off">
+      </div>
+      <div style="width:120px">
+        <label class="flbl">السعر</label>
+        <input class="fin" type="number" min="0" id="nsPrice" value="150">
+      </div>
+      <div style="width:110px">
+        <label class="flbl">الترتيب</label>
+        <input class="fin" type="number" id="nsSort" value="100">
+      </div>
+    </div>
+    <div class="fhint" id="nsHint" style="margin-top:10px"></div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn primary" id="nsSave">إضافة</button>
+      <button class="btn" id="nsCancel">إلغاء</button>
+    </div>`,"");
+  const kind=ov.querySelector("#nsKind"), hint=ov.querySelector("#nsHint");
+  const wrap=ov.querySelector("#nsContentWrap"), lbl=ov.querySelector("#nsContentLbl");
+  const sync=()=>{
+    const k=kind.value;
+    wrap.style.display = k==="art" ? "none" : "";
+    lbl.textContent = k==="phrase" ? "العبارة كما تظهر للاعب" : "الرمز (إيموجي واحد)";
+    hint.innerHTML = k==="art"
+      ? "⚠️ <b>الرسم يُشحن مع التطبيق.</b> سيُضاف <b>موقوفاً</b>، ولا تفعّله حتى ينزل بناءٌ يحمل صورته — قبلها لا يراه أحد."
+      : "يظهر للاعبين فور إضافته.";
+  };
+  kind.onchange=sync; sync();
+  ov.querySelector("#nsCancel").onclick=()=>ov.remove();
+  ov.querySelector("#nsSave").onclick=async()=>{
+    const code=(ov.querySelector("#nsCode").value||"").trim().toLowerCase();
+    const k=kind.value;
+    const content=(ov.querySelector("#nsContent").value||"").trim();
+    const label=(ov.querySelector("#nsLabel").value||"").trim();
+    if(!/^[a-z0-9_]{2,24}$/.test(code)){ toast("المعرّف: حروف إنجليزية صغيرة وأرقام و _ فقط","err"); return; }
+    if(!label){ toast("اكتب اسم الملصق","err"); return; }
+    if(k!=="art" && !content){ toast(k==="phrase"?"اكتب العبارة":"اكتب الرمز","err"); return; }
+    const row={code, kind:k, content:k==="art"?"":content, label,
+      price:Math.max(0,parseInt(ov.querySelector("#nsPrice").value,10)||0),
+      sort_order:parseInt(ov.querySelector("#nsSort").value,10)||100,
+      is_free:false, is_pinned:false, is_active:k!=="art"};
+    act(async()=>{
+      const{error}=await sb.from("reaction_stickers").insert(row);
+      if(error) throw new Error(error.code==="23505"?"هذا المعرّف مستعمل":error.message);
+    },"أُضيف الملصق",async()=>{ ov.remove(); await loadStickers(); });
+  };
+}
+
 // ---- auth ----
 $("#loginForm").addEventListener("submit",async e=>{
   e.preventDefault(); const btn=$("#loginBtn"),msg=$("#loginMsg"); msg.textContent=""; btn.disabled=true; btn.textContent="جارٍ الدخول…";
@@ -891,6 +1056,8 @@ $("#qbtn").addEventListener("click",()=>searchPlayers());
 $("#q").addEventListener("keydown",e=>{if(e.key==="Enter") searchPlayers();});
 $("#tq").addEventListener("keydown",e=>{if(e.key==="Enter"){ go("players"); $("#q").value=$("#tq").value; searchPlayers(); }});
 $("#chatRefresh").addEventListener("click",()=>loadChat());
+$("#stkRefresh").addEventListener("click",()=>loadStickers());
+$("#stkNew").addEventListener("click",()=>newStickerModal());
 $("#maintSave").addEventListener("click",saveMaintenance);
 $("#adSave").addEventListener("click",saveAds);
 $("#noticeSend").addEventListener("click",sendNotice);
@@ -927,7 +1094,7 @@ function go(v){
   if(v==="broadcast"){ loadPushSettings(); loadAnnouncements(); }
   if(v==="staff"){ loadStaff(); loadAudit(); }
   if(v==="money") loadMoney();
-  if(v==="content") loadMessageReports();
+  if(v==="content"){ loadMessageReports(); loadStickers(); }
   if(v==="security") loadSuspicious();
 }
 nav.addEventListener("click",e=>{const a=e.target.closest("a"); if(a) go(a.dataset.v);});
