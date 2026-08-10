@@ -868,6 +868,9 @@ const isOnline=ts=>!!ts && (Date.now()-new Date(ts).getTime())<60000;
 
 function toast(msg,type){const el=document.createElement("div"); el.className="toast "+(type||""); el.textContent=msg;
   $("#toasts").appendChild(el); setTimeout(()=>el.remove(),3200);}
+// ⚠️ `msg` يُحقن **خاماً** ليقبل تنسيقاً بسيطاً (<b> و <br>) — فكل قيمة تأتي
+// من لاعب أو من القاعدة **تُهرَّب بـ`esc()` عند بناء النصّ** لا هنا. العنوان
+// مهرَّب دائماً. (فحصٌ شامل 2026-08-10: كل المستدعين العشرة مطابقون.)
 function confirmDialog(title,msg,danger){
   return new Promise(res=>{
     const ov=document.createElement("div"); ov.className="ov";
@@ -2445,7 +2448,8 @@ async function loadStaff(){
   sel.innerHTML='<option value="">كل المشرفين</option>'+rows.map(r=>`<option value="${r.id}">${esc(r.username)}</option>`).join("");
   box.innerHTML=rows.map(r=>{
     const roleBadge=r.role==="admin"?'<span class="badge a">👑 أدمن</span>':'<span class="badge">🛡️ مشرف</span>';
-    const demote=(isAdmin&&r.role==="moderator")?`<button class="btn sm danger" onclick="setRole('${r.id}','user','${esc(r.username)}')">⬇ سحب</button>`:"";
+    ROLE_NAMES[r.id]=r.username;
+    const demote=(isAdmin&&r.role==="moderator")?`<button class="btn sm danger" onclick="setRole('${r.id}','user')">⬇ سحب</button>`:"";
     return `<div style="display:flex;align-items:center;gap:10px;padding:10px 6px;border-bottom:1px solid var(--line);">
       <div style="flex:1;cursor:pointer" onclick="openPlayer('${r.id}')"><b>${esc(r.username)}</b> ${roleBadge}
         <div style="font-size:11px;color:var(--dim)">${fmt(r.action_count)} إجراء · آخر نشاط ${r.last_active?timeAgo(r.last_active):"—"}</div></div>
@@ -2459,11 +2463,19 @@ async function stSearch(){
   catch(e){ box.innerHTML='<div class="empty">تعذّر البحث</div>'; return; }
   rows=rows.filter(p=>!p.is_guest);
   if(!rows.length){ box.innerHTML='<div class="empty">لا نتائج</div>'; return; }
-  box.innerHTML=rows.map(p=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid var(--line);">
+  box.innerHTML=rows.map(p=>{
+    ROLE_NAMES[p.id]=p.username;
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 6px;border-bottom:1px solid var(--line);">
       <div style="flex:1"><b>${esc(p.username)}</b> <span style="color:var(--dim);font-size:11px;">${esc(p.player_code||"")}</span></div>
-      <button class="btn sm primary" onclick="setRole('${p.id}','moderator','${esc(p.username)}')">🛡️ ترقية لمشرف</button></div>`).join("");
+      <button class="btn sm primary" onclick="setRole('${p.id}','moderator')">🛡️ ترقية لمشرف</button></div>`;
+  }).join("");
 }
-async function setRole(id,role,name){
+// اسم اللاعب لا يمرّ في سِمة `onclick` أبداً — محلّل HTML يفكّ ترميز السِمات
+// **قبل** أن تعمل JavaScript، فـ`esc()` لا تقي هناك واسمٌ مصنوع كان يُنفَّذ
+// كأمر. يمرّ المعرّف وحده (uuid لا يحمل محرفاً خطِراً)، والاسم يُقرأ من هنا.
+const ROLE_NAMES={};
+async function setRole(id,role){
+  const name=esc(ROLE_NAMES[id]||"");   // ومتن النافذة يُحقن خاماً، فيُهرَّب هنا
   const msg=role==="moderator"
     ?`سيحصل «${name}» على صلاحيات الإشراف (كتم، حظر دردشة، إدارة بلاغات…). متابعة؟`
     :`سيفقد «${name}» صلاحيات الإشراف نهائياً. متابعة؟`;
