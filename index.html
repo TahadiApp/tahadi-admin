@@ -702,7 +702,8 @@
               <button type="button" class="btn sm" onclick="bcPreset('invite')">🎮 دعوة لتجربة</button>
               <button type="button" class="btn sm" onclick="bcPreset('discount')">🏷️ خصم بالمتجر</button>
               <button type="button" class="btn sm" onclick="bcPreset('category')">🗂️ تصنيف جديد</button>
-              <button type="button" class="btn sm" onclick="bcPreset('tournament')">🏆 بطولة</button>
+              <!-- زرّ «بطولة» أُزيل (فحص 2026-08-10): وجهته /tournaments لا شاشة
+                   لها في التطبيق فكان الإشعار يفتح شاشة خطأ. يُعاد يوم تُبنى. -->
               <button type="button" class="btn sm" onclick="bcPreset('clear')">💬 فارغ</button>
             </div>
             <label class="flbl" style="margin-top:8px;">العنوان</label>
@@ -722,7 +723,7 @@
               </div>
             </div>
             <div class="row" style="margin-top:12px;"><button class="btn gold" id="bcSend">🔔 إرسال</button></div>
-            <div class="fhint">يصل إشعاراً خارج التطبيق (Push) + داخل الجرس. الوجهات المدعومة: /shop، /achievements، /missions، /tournaments، أو اتركها فارغة لإشعار عادي.</div>
+            <div class="fhint">يصل إشعاراً خارج التطبيق (Push) + داخل الجرس. الوجهات المدعومة: /shop، /achievements، /missions، /home، /notifications، أو اتركها فارغة لإشعار عادي.</div>
           </div>
           <div class="card w7">
             <div class="hd"><h3>📰 إعلان الشاشة الرئيسية</h3><span class="pill">نافذة منبثقة</span></div>
@@ -2030,7 +2031,7 @@ const BC_PRESETS={
   invite:{t:"🎮 جرّبها الآن!",b:"أضفنا ما يستحق التجربة — ادخل واكتشفه بنفسك.",r:"",s:"active"},
   discount:{t:"🏷️ خصومات المتجر!",b:"عروض لفترة محدودة داخل المتجر — لا تفوّتها.",r:"/shop",s:"all"},
   category:{t:"🗂️ تصنيف جديد!",b:"أضفنا تصنيف أسئلة جديداً — جرّبه الآن.",r:"",s:"all"},
-  tournament:{t:"🏆 بطولة جديدة!",b:"انطلقت بطولة جديدة — شارك وتنافس على القمة.",r:"/tournaments",s:"all"},
+  // «بطولة» أُزيلت (فحص 2026-08-10): وجهتها /tournaments لا شاشة لها بعد.
   clear:{t:"",b:"",r:"",s:"all"},
 };
 function bcPreset(k){
