@@ -573,6 +573,22 @@
             </div>
             <div id="stkList"><div class="empty">اضغط «تحديث»</div></div>
           </div>
+          <div class="card w12">
+            <div class="hd">
+              <h3>🎭 المظاهر والأيقونات</h3>
+              <div class="row">
+                <button class="btn sm primary" id="thmNew">+ مظهر / أيقونة</button>
+                <button class="btn sm" id="thmRefresh">↻ تحديث</button>
+              </div>
+            </div>
+            <div class="fhint" style="margin-bottom:12px">
+              <b>الاسم والوصف والسعر والنوع وتاريخ الانتهاء</b> تصل اللاعبين فور حفظها.
+              أما <b>الرسوم</b> فتُشحن داخل التطبيق: مظهرٌ أو أيقونةٌ بلا رسمٍ في البناء الحالي
+              <b>لا يظهر</b> في المتجر أصلاً. <b>النوع</b>: مجاني · بالعملات · موسمي (بتاريخ انتهاء)
+              · يُنال بإنجاز · للمشتركين. <b>ولا حذف — بل إيقاف</b>: من دفع يبقى مالكاً.
+            </div>
+            <div id="thmList"><div class="empty">اضغط «تحديث»</div></div>
+          </div>
         </div>
       </section>
 
@@ -1048,6 +1064,167 @@ function newStickerModal(){
   };
 }
 
+// ================= المظاهر والأيقونات (0230 · 0231) =================
+// الفهرس هنا، والرسوم في البناء (ThemePack / kAppIconArt). ما لا رسمَ له لا يُعرض
+// في المتجر — فالإضافة هنا تُهيّئ الصفّ وتسعّره، والبناء يُظهره.
+const THM_KINDS={free:"مجاني",coins:"بالعملات",seasonal:"موسمي",earned:"يُنال بإنجاز",premium:"للمشتركين"};
+const THM_SCOPES={theme:"مظهر",icon:"أيقونة"};
+let themesCache=[];
+
+async function loadThemes(){
+  const box=$("#thmList"); box.innerHTML=`<div class="empty">جارٍ التحميل…</div>`;
+  const{data,error}=await sb.from("themes")
+    .select("id,scope,name,description,kind,price_coins,sort_order,is_active,available_until,created_at")
+    .order("sort_order").order("id");
+  if(error){ box.innerHTML=`<div class="empty">تعذّر التحميل</div>`; return; }
+  themesCache=data||[];
+  renderThemes();
+}
+
+const thmDate=v=> v? new Date(v).toISOString().slice(0,10) : "";
+
+function renderThemes(){
+  const box=$("#thmList");
+  if(!themesCache.length){ box.innerHTML=`<div class="empty">لا مظاهر بعد</div>`; return; }
+  box.innerHTML=themesCache.map(x=>{
+    const off=x.is_active!==true;
+    const priced = x.kind==="coins"||x.kind==="seasonal";
+    return `<div class="ctrow" style="align-items:center;gap:10px;flex-wrap:wrap;${off?"opacity:.55":""}">
+      <div style="width:110px">
+        <span class="pill" style="font-size:11px">${x.scope==="icon"?"📱":"🎨"} ${THM_SCOPES[x.scope]||x.scope}</span>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">${esc(x.id)}</div>
+      </div>
+      <div style="flex:1;min-width:160px">
+        <input class="fin" data-thm="name" data-id="${esc(x.id)}" value="${esc(x.name||"")}" style="padding:7px 10px" placeholder="الاسم">
+        <input class="fin" data-thm="desc" data-id="${esc(x.id)}" value="${esc(x.description||"")}" style="padding:7px 10px;margin-top:4px" placeholder="الوصف">
+      </div>
+      <div style="width:130px">
+        <label class="flbl">النوع</label>
+        <select class="fin" data-thm="kind" data-id="${esc(x.id)}" style="padding:7px 10px">
+          ${Object.entries(THM_KINDS).map(([k,v])=>`<option value="${k}" ${x.kind===k?"selected":""}>${v}</option>`).join("")}
+        </select>
+      </div>
+      <div style="width:96px">
+        <label class="flbl">السعر</label>
+        <input class="fin" type="number" min="0" data-thm="price" data-id="${esc(x.id)}" value="${x.price_coins??""}" ${priced?"":"disabled"} style="padding:7px 10px">
+      </div>
+      <div style="width:150px">
+        <label class="flbl">ينتهي في (للموسمي)</label>
+        <input class="fin" type="date" data-thm="until" data-id="${esc(x.id)}" value="${thmDate(x.available_until)}" style="padding:7px 10px">
+      </div>
+      <div style="width:84px">
+        <label class="flbl">الترتيب</label>
+        <input class="fin" type="number" data-thm="sort" data-id="${esc(x.id)}" value="${x.sort_order??0}" style="padding:7px 10px">
+      </div>
+      <div class="seg">
+        <button class="${!off?'on-g':''}" onclick="setThemeActive('${esc(x.id)}',true)">مفعّل</button>
+        <button class="${off?'on-a':''}" onclick="setThemeActive('${esc(x.id)}',false)">موقوف</button>
+      </div>
+      <button class="btn sm primary" onclick="saveTheme('${esc(x.id)}')">حفظ</button>
+    </div>`;}).join("");
+  // السعر يُفعَّل مع النوع المسعَّر وحده.
+  document.querySelectorAll('[data-thm="kind"]').forEach(sel=>{
+    sel.onchange=()=>{ const p=thmField(sel.dataset.id,"price"); if(p) p.disabled=!(sel.value==="coins"||sel.value==="seasonal"); };
+  });
+}
+
+const thmField=(id,f)=>document.querySelector(`[data-thm="${f}"][data-id="${id}"]`);
+
+async function saveTheme(id){
+  const name=(thmField(id,"name")||{}).value, desc=(thmField(id,"desc")||{}).value;
+  const kind=(thmField(id,"kind")||{}).value;
+  const priceEl=thmField(id,"price"), untilEl=thmField(id,"until"), sortEl=thmField(id,"sort");
+  if(!(name||"").trim()){ toast("الاسم لا يكون فارغاً","err"); return; }
+  const priced = kind==="coins"||kind==="seasonal";
+  const patch={ name:name.trim(), description:(desc||"").trim(), kind,
+    price_coins: priced ? Math.max(0,parseInt(priceEl.value,10)||0) : null,
+    sort_order: parseInt(sortEl.value,10)||0,
+    available_until: untilEl.value ? new Date(untilEl.value+"T23:59:59").toISOString() : null };
+  if(priced && !patch.price_coins){ toast("اكتب سعراً للمظهر المسعَّر","err"); return; }
+  if(kind==="seasonal" && !patch.available_until){ toast("الموسمي يحتاج تاريخ انتهاء","err"); return; }
+  act(async()=>{
+    const{error}=await sb.from("themes").update(patch).eq("id",id);
+    if(error) throw error;
+  },"حُفظ",loadThemes);
+}
+
+async function setThemeActive(id,on){
+  act(async()=>{
+    const{error}=await sb.from("themes").update({is_active:on}).eq("id",id);
+    if(error) throw error;
+  }, on?"فُعّل":"أُوقف", loadThemes);
+}
+
+function newThemeModal(){
+  const ov=showModal("مظهر / أيقونة جديدة",`
+    <div class="row" style="gap:10px;flex-wrap:wrap">
+      <div style="width:130px">
+        <label class="flbl">النطاق</label>
+        <select class="fin" id="ntScope"><option value="theme">مظهر</option><option value="icon">أيقونة</option></select>
+      </div>
+      <div style="flex:1;min-width:150px">
+        <label class="flbl">المعرّف (إنجليزي، لا يُعدَّل — يطابق رسمه في البناء)</label>
+        <input class="fin" id="ntId" placeholder="ice" autocomplete="off">
+      </div>
+    </div>
+    <div class="row" style="gap:10px;margin-top:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:150px">
+        <label class="flbl">الاسم في المتجر</label>
+        <input class="fin" id="ntName" placeholder="الجليد الذهبي" autocomplete="off">
+      </div>
+      <div style="flex:1;min-width:180px">
+        <label class="flbl">الوصف (سطر)</label>
+        <input class="fin" id="ntDesc" placeholder="أزرقٌ فاتح وذهب" autocomplete="off">
+      </div>
+    </div>
+    <div class="row" style="gap:10px;margin-top:10px;flex-wrap:wrap">
+      <div style="width:140px">
+        <label class="flbl">النوع</label>
+        <select class="fin" id="ntKind">${Object.entries(THM_KINDS).map(([k,v])=>`<option value="${k}" ${k==="coins"?"selected":""}>${v}</option>`).join("")}</select>
+      </div>
+      <div style="width:110px">
+        <label class="flbl">السعر</label>
+        <input class="fin" type="number" min="0" id="ntPrice" value="1500">
+      </div>
+      <div style="width:150px">
+        <label class="flbl">ينتهي في (للموسمي)</label>
+        <input class="fin" type="date" id="ntUntil">
+      </div>
+      <div style="width:100px">
+        <label class="flbl">الترتيب</label>
+        <input class="fin" type="number" id="ntSort" value="50">
+      </div>
+    </div>
+    <div class="fhint" style="margin-top:10px">⚠️ <b>الرسم يُشحن مع التطبيق.</b> يُضاف <b>موقوفاً</b>؛ فعّله بعد نزول بناءٍ يحمل رسمه — وقبلها لا يراه أحد ولو فُعِّل.</div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn primary" id="ntSave">إضافة</button>
+      <button class="btn" id="ntCancel">إلغاء</button>
+    </div>`,"");
+  ov.querySelector("#ntCancel").onclick=()=>ov.remove();
+  const kindSel=ov.querySelector("#ntKind"), priceIn=ov.querySelector("#ntPrice");
+  kindSel.onchange=()=>{ priceIn.disabled=!(kindSel.value==="coins"||kindSel.value==="seasonal"); };
+  ov.querySelector("#ntSave").onclick=async()=>{
+    const id=(ov.querySelector("#ntId").value||"").trim().toLowerCase();
+    const scope=ov.querySelector("#ntScope").value, kind=kindSel.value;
+    const name=(ov.querySelector("#ntName").value||"").trim();
+    const desc=(ov.querySelector("#ntDesc").value||"").trim();
+    const until=ov.querySelector("#ntUntil").value;
+    if(!/^[a-z0-9_]{2,32}$/.test(id)){ toast("المعرّف: حروف إنجليزية صغيرة وأرقام و _ فقط","err"); return; }
+    if(!name){ toast("اكتب الاسم","err"); return; }
+    const priced = kind==="coins"||kind==="seasonal";
+    if(kind==="seasonal" && !until){ toast("الموسمي يحتاج تاريخ انتهاء","err"); return; }
+    const row={ id, scope, name, description:desc, kind,
+      price_coins: priced ? Math.max(0,parseInt(priceIn.value,10)||0) : null,
+      sort_order: parseInt(ov.querySelector("#ntSort").value,10)||50,
+      available_until: until ? new Date(until+"T23:59:59").toISOString() : null,
+      is_active:false };
+    act(async()=>{
+      const{error}=await sb.from("themes").insert(row);
+      if(error) throw new Error(error.code==="23505"?"هذا المعرّف مستعمل":error.message);
+    },"أُضيف موقوفاً",async()=>{ ov.remove(); await loadThemes(); });
+  };
+}
+
 // ---- auth ----
 $("#loginForm").addEventListener("submit",async e=>{
   e.preventDefault(); const btn=$("#loginBtn"),msg=$("#loginMsg"); msg.textContent=""; btn.disabled=true; btn.textContent="جارٍ الدخول…";
@@ -1062,6 +1239,8 @@ $("#tq").addEventListener("keydown",e=>{if(e.key==="Enter"){ go("players"); $("#
 $("#chatRefresh").addEventListener("click",()=>loadChat());
 $("#stkRefresh").addEventListener("click",()=>loadStickers());
 $("#stkNew").addEventListener("click",()=>newStickerModal());
+$("#thmRefresh").addEventListener("click",()=>loadThemes());
+$("#thmNew").addEventListener("click",()=>newThemeModal());
 $("#maintSave").addEventListener("click",saveMaintenance);
 $("#adSave").addEventListener("click",saveAds);
 $("#noticeSend").addEventListener("click",sendNotice);
@@ -1098,7 +1277,7 @@ function go(v){
   if(v==="broadcast"){ loadPushSettings(); loadAnnouncements(); }
   if(v==="staff"){ loadStaff(); loadAudit(); }
   if(v==="money") loadMoney();
-  if(v==="content"){ loadMessageReports(); loadStickers(); }
+  if(v==="content"){ loadMessageReports(); loadStickers(); loadThemes(); }
   if(v==="security") loadSuspicious();
 }
 nav.addEventListener("click",e=>{const a=e.target.closest("a"); if(a) go(a.dataset.v);});
