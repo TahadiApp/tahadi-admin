@@ -584,6 +584,8 @@
             <div class="fhint" style="margin-bottom:12px">
               <b>الاسم والوصف والسعر والنوع وموعدا الظهور والانتهاء</b> تصل اللاعبين فور حفظها.
               <b>الإخفاء</b>: «موقوف» يُخفيه فوراً، و«يظهر من» يُظهره وحده في موعده — للدفعات والمواسم.
+              <b>العرض</b>: سعر عرض + تاريخ انتهاء؛ يظهر للاعب بالسعر الأصلي مشطوباً ووسم «عرض ينتهي بعد N يوم» ويعود وحده.
+              والأسعار بحسب <b>سلّم التسعير</b>: عادي 2500 · موسمي 2000 · للمشتركين 1000 · أيقونة 1200 · خرافي 5000.
               أما <b>الرسوم</b> فتُشحن داخل التطبيق: مظهرٌ أو أيقونةٌ بلا رسمٍ في البناء الحالي
               <b>لا يظهر</b> في المتجر أصلاً. <b>النوع</b>: مجاني · بالعملات · موسمي (بتاريخ انتهاء)
               · يُنال بإنجاز · للمشتركين. <b>ولا حذف — بل إيقاف</b>: من دفع يبقى مالكاً.
@@ -1075,7 +1077,7 @@ let themesCache=[];
 async function loadThemes(){
   const box=$("#thmList"); box.innerHTML=`<div class="empty">جارٍ التحميل…</div>`;
   const{data,error}=await sb.from("themes")
-    .select("id,scope,name,description,kind,price_coins,sort_order,is_active,available_from,available_until,created_at")
+    .select("id,scope,name,description,kind,price_coins,sort_order,is_active,available_from,available_until,sale_price_coins,sale_until,created_at")
     .order("sort_order").order("id");
   if(error){ box.innerHTML=`<div class="empty">تعذّر التحميل</div>`; return; }
   themesCache=data||[];
@@ -1117,6 +1119,14 @@ function renderThemes(){
         <label class="flbl">ينتهي في (للموسمي)</label>
         <input class="fin" type="date" data-thm="until" data-id="${esc(x.id)}" value="${thmDate(x.available_until)}" style="padding:7px 10px">
       </div>
+      <div style="width:96px">
+        <label class="flbl">سعر العرض</label>
+        <input class="fin" type="number" min="0" data-thm="sale" data-id="${esc(x.id)}" value="${x.sale_price_coins??""}" style="padding:7px 10px" placeholder="—">
+      </div>
+      <div style="width:150px">
+        <label class="flbl">العرض ينتهي في</label>
+        <input class="fin" type="date" data-thm="saleuntil" data-id="${esc(x.id)}" value="${thmDate(x.sale_until)}" style="padding:7px 10px">
+      </div>
       <div style="width:84px">
         <label class="flbl">الترتيب</label>
         <input class="fin" type="number" data-thm="sort" data-id="${esc(x.id)}" value="${x.sort_order??0}" style="padding:7px 10px">
@@ -1139,14 +1149,20 @@ async function saveTheme(id){
   const name=(thmField(id,"name")||{}).value, desc=(thmField(id,"desc")||{}).value;
   const kind=(thmField(id,"kind")||{}).value;
   const priceEl=thmField(id,"price"), untilEl=thmField(id,"until"), fromEl=thmField(id,"from"), sortEl=thmField(id,"sort");
+  const saleEl=thmField(id,"sale"), saleUntilEl=thmField(id,"saleuntil");
   if(!(name||"").trim()){ toast("الاسم لا يكون فارغاً","err"); return; }
   const priced = kind==="coins"||kind==="seasonal";
   const patch={ name:name.trim(), description:(desc||"").trim(), kind,
     price_coins: priced ? Math.max(0,parseInt(priceEl.value,10)||0) : null,
     sort_order: parseInt(sortEl.value,10)||0,
     available_from: fromEl.value ? new Date(fromEl.value+"T00:00:00").toISOString() : null,
-    available_until: untilEl.value ? new Date(untilEl.value+"T23:59:59").toISOString() : null };
+    available_until: untilEl.value ? new Date(untilEl.value+"T23:59:59").toISOString() : null,
+    sale_price_coins: saleEl.value ? Math.max(0,parseInt(saleEl.value,10)||0) : null,
+    sale_until: saleUntilEl.value ? new Date(saleUntilEl.value+"T23:59:59").toISOString() : null };
   if(priced && !patch.price_coins){ toast("اكتب سعراً للمظهر المسعَّر","err"); return; }
+  // العرض مؤقّت دائماً (سياسة التسعير): سعرٌ بلا تاريخ، أو تاريخٌ بلا سعر، أو سعرٌ لا يقلّ عن الأصل — مرفوض.
+  if((patch.sale_price_coins!=null) !== (patch.sale_until!=null)){ toast("العرض يحتاج السعر والتاريخ معاً","err"); return; }
+  if(patch.sale_price_coins!=null && priced && patch.sale_price_coins>=patch.price_coins){ toast("سعر العرض يجب أن يكون أقل من السعر الأصلي","err"); return; }
   if(kind==="seasonal" && !patch.available_until){ toast("الموسمي يحتاج تاريخ انتهاء","err"); return; }
   act(async()=>{
     const{error}=await sb.from("themes").update(patch).eq("id",id);
