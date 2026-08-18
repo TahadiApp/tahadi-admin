@@ -582,7 +582,8 @@
               </div>
             </div>
             <div class="fhint" style="margin-bottom:12px">
-              <b>الاسم والوصف والسعر والنوع وتاريخ الانتهاء</b> تصل اللاعبين فور حفظها.
+              <b>الاسم والوصف والسعر والنوع وموعدا الظهور والانتهاء</b> تصل اللاعبين فور حفظها.
+              <b>الإخفاء</b>: «موقوف» يُخفيه فوراً، و«يظهر من» يُظهره وحده في موعده — للدفعات والمواسم.
               أما <b>الرسوم</b> فتُشحن داخل التطبيق: مظهرٌ أو أيقونةٌ بلا رسمٍ في البناء الحالي
               <b>لا يظهر</b> في المتجر أصلاً. <b>النوع</b>: مجاني · بالعملات · موسمي (بتاريخ انتهاء)
               · يُنال بإنجاز · للمشتركين. <b>ولا حذف — بل إيقاف</b>: من دفع يبقى مالكاً.
@@ -1074,7 +1075,7 @@ let themesCache=[];
 async function loadThemes(){
   const box=$("#thmList"); box.innerHTML=`<div class="empty">جارٍ التحميل…</div>`;
   const{data,error}=await sb.from("themes")
-    .select("id,scope,name,description,kind,price_coins,sort_order,is_active,available_until,created_at")
+    .select("id,scope,name,description,kind,price_coins,sort_order,is_active,available_from,available_until,created_at")
     .order("sort_order").order("id");
   if(error){ box.innerHTML=`<div class="empty">تعذّر التحميل</div>`; return; }
   themesCache=data||[];
@@ -1108,6 +1109,10 @@ function renderThemes(){
         <label class="flbl">السعر</label>
         <input class="fin" type="number" min="0" data-thm="price" data-id="${esc(x.id)}" value="${x.price_coins??""}" ${priced?"":"disabled"} style="padding:7px 10px">
       </div>
+      <div style="width:140px">
+        <label class="flbl">يظهر من</label>
+        <input class="fin" type="date" data-thm="from" data-id="${esc(x.id)}" value="${thmDate(x.available_from)}" style="padding:7px 10px">
+      </div>
       <div style="width:150px">
         <label class="flbl">ينتهي في (للموسمي)</label>
         <input class="fin" type="date" data-thm="until" data-id="${esc(x.id)}" value="${thmDate(x.available_until)}" style="padding:7px 10px">
@@ -1133,12 +1138,13 @@ const thmField=(id,f)=>document.querySelector(`[data-thm="${f}"][data-id="${id}"
 async function saveTheme(id){
   const name=(thmField(id,"name")||{}).value, desc=(thmField(id,"desc")||{}).value;
   const kind=(thmField(id,"kind")||{}).value;
-  const priceEl=thmField(id,"price"), untilEl=thmField(id,"until"), sortEl=thmField(id,"sort");
+  const priceEl=thmField(id,"price"), untilEl=thmField(id,"until"), fromEl=thmField(id,"from"), sortEl=thmField(id,"sort");
   if(!(name||"").trim()){ toast("الاسم لا يكون فارغاً","err"); return; }
   const priced = kind==="coins"||kind==="seasonal";
   const patch={ name:name.trim(), description:(desc||"").trim(), kind,
     price_coins: priced ? Math.max(0,parseInt(priceEl.value,10)||0) : null,
     sort_order: parseInt(sortEl.value,10)||0,
+    available_from: fromEl.value ? new Date(fromEl.value+"T00:00:00").toISOString() : null,
     available_until: untilEl.value ? new Date(untilEl.value+"T23:59:59").toISOString() : null };
   if(priced && !patch.price_coins){ toast("اكتب سعراً للمظهر المسعَّر","err"); return; }
   if(kind==="seasonal" && !patch.available_until){ toast("الموسمي يحتاج تاريخ انتهاء","err"); return; }
@@ -1186,6 +1192,10 @@ function newThemeModal(){
         <label class="flbl">السعر</label>
         <input class="fin" type="number" min="0" id="ntPrice" value="1500">
       </div>
+      <div style="width:140px">
+        <label class="flbl">يظهر من</label>
+        <input class="fin" type="date" id="ntFrom">
+      </div>
       <div style="width:150px">
         <label class="flbl">ينتهي في (للموسمي)</label>
         <input class="fin" type="date" id="ntUntil">
@@ -1208,7 +1218,7 @@ function newThemeModal(){
     const scope=ov.querySelector("#ntScope").value, kind=kindSel.value;
     const name=(ov.querySelector("#ntName").value||"").trim();
     const desc=(ov.querySelector("#ntDesc").value||"").trim();
-    const until=ov.querySelector("#ntUntil").value;
+    const until=ov.querySelector("#ntUntil").value, from=ov.querySelector("#ntFrom").value;
     if(!/^[a-z0-9_]{2,32}$/.test(id)){ toast("المعرّف: حروف إنجليزية صغيرة وأرقام و _ فقط","err"); return; }
     if(!name){ toast("اكتب الاسم","err"); return; }
     const priced = kind==="coins"||kind==="seasonal";
@@ -1216,6 +1226,7 @@ function newThemeModal(){
     const row={ id, scope, name, description:desc, kind,
       price_coins: priced ? Math.max(0,parseInt(priceIn.value,10)||0) : null,
       sort_order: parseInt(ov.querySelector("#ntSort").value,10)||50,
+      available_from: from ? new Date(from+"T00:00:00").toISOString() : null,
       available_until: until ? new Date(until+"T23:59:59").toISOString() : null,
       is_active:false };
     act(async()=>{
