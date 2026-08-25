@@ -270,6 +270,7 @@
   .cmsg .x{font-size:13px;line-height:1.55;word-break:break-word;} .cmsg .a{display:flex;gap:6px;margin-top:8px;}
   .badge{font-size:9.5px;font-weight:800;padding:1px 6px;border-radius:999px;}
   .badge.r{background:rgba(248,113,113,.9);color:#3a0000;} .badge.a{background:rgba(251,191,36,.9);color:#3a2d00;}
+  .badge.b{background:rgba(96,165,250,.92);color:#00203f;}
 
   /* modal */
   .ov{position:fixed;inset:0;background:rgba(6,1,14,.74);backdrop-filter:blur(4px);z-index:20;display:grid;place-items:center;padding:22px;animation:fade .18s ease;}
@@ -880,6 +881,10 @@ const fmt=n=>(n==null?"—":Number(n).toLocaleString("en-US"));
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const kv=(k,v)=>`<div><div class="k">${k}</div><div class="val">${v}</div></div>`;
 const PREM='<span class="badge a">مميّز</span>';
+// وسمُ الخصم الآليّ — **في اللوحة وحدها** (قرار المستخدم 2026-08-25:
+// «العلامة في اللوحة لا في الاسم»). فالاسم يبقى طبيعياً بلا لاحقةٍ تفضحه،
+// ولا يراه لاعب: مصدرُه سجلٌّ مستور لا تقرؤه إلا دوالُّ الإشراف.
+const BOT='<span class="badge b">آليّ</span>';
 async function rpc(name,args){const{data,error}=await sb.rpc(name,args||{}); if(error) throw error; return data;}
 function timeAgo(ts){if(!ts)return""; const s=Math.max(0,(Date.now()-new Date(ts).getTime())/1000);
   if(s<60)return"قبل "+Math.floor(s)+"ث"; if(s<3600)return"قبل "+Math.floor(s/60)+"د"; if(s<86400)return"قبل "+Math.floor(s/3600)+"س"; return"قبل "+Math.floor(s/86400)+"ي";}
@@ -1428,7 +1433,7 @@ function playerRow(p, meta){
     : `<span class="ac" style="color:var(--dim)">🕓 آخر ظهور ${p.last_active?timeAgo(p.last_active):"—"}</span>`);
   return `<div class="orow" data-id="${p.id}"><span class="dot" style="${on?'':'background:var(--dim)'}"></span>
     <span class="av" style="${on?'':'filter:grayscale(.7);opacity:.75'}">${esc((p.username||"؟").trim().charAt(0))}</span>
-    <div><div>${esc(p.username||"لاعب")} ${p.is_premium?PREM:""}${p.is_banned?'<span class="badge r">محظور</span>':""}</div>
+    <div><div>${esc(p.username||"لاعب")} ${p.is_bot?BOT:""}${p.is_premium?PREM:""}${p.is_banned?'<span class="badge r">محظور</span>':""}</div>
       <div class="cd">${esc(p.player_code||"")}</div></div>
     <span style="flex:1"></span>${status}</div>`;
 }
@@ -1762,7 +1767,8 @@ async function openPlayer(id){
     : p.refund_flagged
       ? `<span class="badge" style="margin-right:6px">⚠️ وسم أول · داخلي</span>`
       : "";
-  showModal(`👤 ${esc(p.username)} <span style="color:var(--dim);font-size:12px">${esc(p.player_code||"")}</span>${flag}`,`
+  const botTag = p.is_bot ? `<span class="badge b" style="margin-right:6px">آليّ</span>` : "";
+  showModal(`👤 ${esc(p.username)} <span style="color:var(--dim);font-size:12px">${esc(p.player_code||"")}</span>${botTag}${flag}`,`
     <div class="kv">
       ${kv("الحالة الآن",on?`<span style="color:var(--green)">🟢 ${ACT_AR[p.current_activity]||"متصل"}</span>`:`<span style="color:var(--dim)">🕓 آخر ظهور ${p.last_active?timeAgo(p.last_active):"—"}</span>`)}
       ${kv("المستوى",esc(p.level||"—"))}${kv("XP",fmt(p.xp))}${kv("العملات",
