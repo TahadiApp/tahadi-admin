@@ -442,6 +442,8 @@
               <div class="sg"><div class="k">🗑️ حذفوا حساباتهم</div><div class="v num" id="b_delreg" style="color:var(--red)">—</div></div>
               <div class="dv"></div>
               <div class="sg"><div class="k">🧹 ضيوف حُذفوا</div><div class="v num" id="b_delguest" style="color:var(--orange)">—</div></div>
+              <div class="dv"></div>
+              <div class="sg"><div class="k">🤖 خصوم آليّون</div><div class="v num" id="b_bots" style="color:#60A5FA">—</div></div>
             </div>
           </div>
           <div class="w3"><div class="stat" style="border-color:color-mix(in srgb,var(--pink) 38%,transparent);box-shadow:var(--sh-card),0 0 52px color-mix(in srgb,var(--pink) 18%,transparent)">
@@ -1333,9 +1335,14 @@ async function enter(){
 function renderSnapshot(s){
   const conv=s.total_players?(s.premium_count/s.total_players*100).toFixed(1):"0";
   const kpis=[
-    {id:"kpiOnline",ic:"🟢",l:"متصلون الآن",v:fmt(s.online_now),c:"var(--green)",sub:"اضغط لعرض القائمة ←"},
+    // ⚠️ **الأرقام كلُّها بشرٌ الآن** (2026-08-25): الخصوم الآليّون كانوا
+    // يُحسبون فيها، وهم مستيقظون أبداً — فقالت اللوحة «37 متصلاً» والإنسانُ
+    // فيهم واحد. **وعددُهم يُعرض تحت الرقم** لا يُحذف.
+    {id:"kpiOnline",ic:"🟢",l:"متصلون الآن",v:fmt(s.online_now),c:"var(--green)",
+     sub:(s.bots_online?"ومعهم "+fmt(s.bots_online)+" خصماً آلياً · ":"")+"اضغط لعرض القائمة ←"},
     {ic:"⚔️",l:"داخل مباريات",v:fmt(s.in_matches_now),c:"var(--primary-l)",sub:fmt(s.queue)+" في الطابور"},
-    {ic:"🎯",l:"مباريات اليوم",v:fmt(s.matches_today),c:"var(--blue)",sub:fmt(s.matches_7d)+" هذا الأسبوع"},
+    {ic:"🎯",l:"مباريات اليوم",v:fmt(s.matches_today),c:"var(--blue)",
+     sub:fmt(s.matches_7d)+" هذا الأسبوع"+(s.bot_matches_today?" · و"+fmt(s.bot_matches_today)+" مع خصمٍ آلي":"")},
     {id:"kpiNew",ic:"✨",l:"تسجيلات اليوم",v:fmt(s.new_today),c:"var(--text)",sub:fmt(s.total_players)+" إجمالي · للقائمة ←"},
     {id:"kpiPremium",ic:"👑",l:"مشتركو Premium",v:fmt(s.premium_count),c:"var(--gold-l)",sub:conv+"% تحويل · للقائمة ←"},
   ];
@@ -1383,7 +1390,7 @@ function renderSnapshot(s){
 
   const a=s.by_activity||{}; const tot=Object.values(a).reduce((x,y)=>x+y,0)||1;
   const rows=Object.entries(a).sort((x,y)=>y[1]-x[1]);
-  setT("onlinePill",fmt(s.online_now)+" متصل");
+  setT("onlinePill",fmt(s.online_now)+" متصل"+(s.bots_online?" +"+fmt(s.bots_online)+" آلي":""));
   $("#activity").innerHTML=rows.length?rows.map(([k,v])=>{const w=Math.max(3,Math.round(v/tot*100));
     return `<div class="bar"><div class="br"><span>${ACT_AR[k]||k}</span><b class="num">${fmt(v)}</b></div><div class="tr"><div class="fl" style="width:${w}%;background:${ACT_COLOR[k]||"#A855F7"}"></div></div></div>`;}).join(""):`<div class="empty">لا نشاط مُسجَّل الآن.</div>`;
 
@@ -2320,6 +2327,8 @@ async function loadBreakdown(){try{
   const b=await rpc("admin_players_breakdown");
   $("#b_total").textContent=fmt(b.total); $("#b_reg").textContent=fmt(b.registered);
   $("#b_guest").textContent=fmt(b.guests); $("#b_delreg").textContent=fmt(b.deleted_registered);
+  // الخصوم الآليّون خارج الأعداد أعلاه — ويُذكر عددهم بجانبها كي لا يُظنّ نقصاً.
+  const bh=$("#b_bots"); if(bh) bh.textContent=fmt(b.bots);
   $("#b_delguest").textContent=fmt(b.deleted_guests);
 }catch(e){}}
 async function loadFees(){try{
