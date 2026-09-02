@@ -761,6 +761,31 @@
             <div class="lbl">الإعلانات الحالية</div>
             <div id="anList"><div class="empty">—</div></div>
           </div>
+
+          <!-- ===== الإشعار اليومي ===== -->
+          <div class="card w12">
+            <div class="hd"><h3>🌙 النبضة اليومية — 8 مساءً</h3><span class="pill" id="nudgeStatus">…</span></div>
+            <div class="fhint" style="margin-bottom:12px;">
+              رسالة واحدة كل ليلة الساعة 8 مساءً بتوقيت الرياض، تصل <b>لمن لم يلعب ذلك اليوم فقط</b>.
+              من لعب لا يصله شيء، ومن وصله إشعار خلال الساعات الأخيرة يُترك لليوم التالي.
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;">
+              <label class="switch"><input type="checkbox" id="nudgeEnabled"><span class="track"></span><span style="font-size:13px;font-weight:700">تشغيل النبضة اليومية</span></label>
+              <div><div class="flbl">نسبة ليالي السؤال من بنك الأسئلة (%)</div><input class="fin num" type="number" id="nudgeQPct" min="0" max="100" style="width:110px"></div>
+              <div><div class="flbl">لا يتكرر النص على اللاعب قبل (يوم)</div><input class="fin num" type="number" id="nudgeRepeat" min="1" max="365" style="width:110px"></div>
+              <div><div class="flbl">لا يُرسل لمن وصله إشعار خلال (ساعة)</div><input class="fin num" type="number" id="nudgeQuiet" min="0" max="24" style="width:110px"></div>
+            </div>
+            <div class="lbl" style="margin-top:16px;">النصوص العاملة — <span id="nudgeCount">0</span> نص · كل سطر رسالة</div>
+            <div class="fhint">الأسطر المشروطة تبدأ بوسمها بين قوسين، مثل <code>[streak_alive] سلسلتك تعتمد عليك</code> — والسطر بلا وسم يصل الجميع.</div>
+            <textarea class="fin" id="nudgeLines" rows="12" spellcheck="false" style="font-family:ui-monospace,monospace;font-size:12px;line-height:1.9"></textarea>
+            <div class="row" style="margin-top:12px;">
+              <button class="btn primary" id="nudgeSave">💾 حفظ</button>
+              <button class="btn gold" id="nudgeTest">🔔 أرسلها الآن للتجربة</button>
+            </div>
+            <div class="fhint" style="margin-top:8px;">
+              «أرسلها الآن» تخضع لنفس الشروط — من لعب اليوم لا يصله، ومن وصلته نبضة اليوم لا تتكرر عليه. فالضغط مرتين لا يرسل مرتين.
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1283,6 +1308,8 @@ $("#mcSave").addEventListener("click",saveMatch);
 $("#slSave").addEventListener("click",saveLadder);
 $("#bcSend").addEventListener("click",broadcast);
 $("#pushSave").addEventListener("click",savePushSettings);
+$("#nudgeSave").addEventListener("click",saveNudge);
+$("#nudgeTest").addEventListener("click",testNudge);
 $("#anCreate").addEventListener("click",createAnnouncement);
 $("#themeTog").addEventListener("click",e=>{const b=e.target.closest("button"); if(b) applyTheme(b.dataset.t);});
 $("#stqBtn").addEventListener("click",stSearch);
@@ -1308,7 +1335,7 @@ function go(v){
   $(".body").scrollTop=0;
   if(v==="livechat") loadChat();
   if(v==="control") loadControl();
-  if(v==="broadcast"){ loadPushSettings(); loadAnnouncements(); }
+  if(v==="broadcast"){ loadPushSettings(); loadAnnouncements(); loadNudge(); }
   if(v==="staff"){ loadStaff(); loadAudit(); }
   if(v==="money") loadMoney();
   if(v==="content"){ loadMessageReports(); loadStickers(); loadThemes(); }
@@ -2267,6 +2294,68 @@ async function broadcast(){
     $("#bcTitle").value=""; $("#bcBody").value=""; $("#bcRoute").value=""; toast("أُرسل إلى "+fmt(n)+" لاعب","ok"); });
 }
 // ---- push notification settings (master + per-type + auto-category) ----
+
+// ===== النبضة اليومية =====
+// النصوص تُعرض سطراً سطراً: «[شرط] النص»، والسطر بلا قوسين بلا شرط.
+// ⚠️ والمحجوزة (held) لا تُعرض ولا تُمسّ — تبقى كما هي في الإعداد.
+let NUDGE_RAW=null;
+function nudgeToText(lines){
+  return (lines||[]).map(function(l){
+    return (l.c&&l.c!=="any"?("["+l.c+"] "):"")+l.t;
+  }).join("\n");
+}
+function nudgeFromText(txt,old){
+  const byText={}; (old||[]).forEach(function(l){ byText[l.t]=l.id; });
+  let next=1; (old||[]).forEach(function(l){ if(l.id>=next) next=l.id+1; });
+  return txt.split("\n").map(function(raw){
+    const line=raw.trim(); if(!line) return null;
+    const m=line.match(/^\[([a-z_]+)\]\s*(.+)$/);
+    const c=m?m[1]:"any", t=m?m[2].trim():line;
+    if(!t) return null;
+    // النصُّ نفسه يحتفظ برقمه، فلا ينهار منعُ التكرار عند كل حفظ
+    return {id: byText[t]||next++, c:c, t:t};
+  }).filter(Boolean);
+}
+async function loadNudge(){
+  const r=await sb.from("app_config").select("value").eq("key","daily_nudge");
+  const v=(r.data&&r.data[0]&&r.data[0].value)||null;
+  if(!v){ $("#nudgeStatus").textContent="غير مثبّتة"; $("#nudgeLines").value=""; return; }
+  NUDGE_RAW=v;
+  $("#nudgeEnabled").checked=!!v.enabled;
+  $("#nudgeQPct").value=v.question_pct||0;
+  $("#nudgeRepeat").value=v.no_repeat_days||60;
+  $("#nudgeQuiet").value=v.quiet_hours||6;
+  $("#nudgeLines").value=nudgeToText(v.lines);
+  $("#nudgeCount").textContent=(v.lines||[]).length;
+  $("#nudgeStatus").textContent=v.enabled?"تعمل ✅":"متوقفة";
+}
+async function saveNudge(){
+  const pct=parseInt($("#nudgeQPct").value,10)||0;
+  if(pct<0||pct>100){ toast("نسبة السؤال بين 0 و100","err"); return; }
+  await act(async function(){
+    // **تُقرأ القيمة كاملةً ثم يُدمج عليها** — وإلا مُحيت النصوص المحجوزة
+    // (held) بصمت، وهو العطب نفسه الذي وقع في حفظ الصيانة من قبل.
+    const c=await sb.from("app_config").select("value").eq("key","daily_nudge").single();
+    if(c.error||!c.data) throw c.error||new Error("تعذّرت قراءة الإعداد الحالي — لم يُحفظ شيء");
+    const cur=c.data.value||{};
+    const lines=nudgeFromText($("#nudgeLines").value,cur.lines);
+    if(!lines.length&&pct<=0) throw new Error("لا نصوص ولا أسئلة — لن يصل اللاعب شيء");
+    const next=Object.assign({},cur,{
+      enabled:$("#nudgeEnabled").checked,
+      question_pct:pct,
+      no_repeat_days:parseInt($("#nudgeRepeat").value,10)||60,
+      quiet_hours:parseInt($("#nudgeQuiet").value,10)||0,
+      lines:lines
+    });
+    const u=await sb.from("app_config").update({value:next}).eq("key","daily_nudge");
+    if(u.error) throw u.error;
+  },"حُفظت النبضة اليومية",loadNudge);
+}
+async function testNudge(){
+  await act(function(){ return sb.rpc("admin_send_daily_nudge"); },
+            "أُرسلت النبضة",loadNudge);
+}
+
 async function loadPushSettings(){
   try{
     const s=await rpc("admin_push_settings"); const muted=s.muted_types||[];
