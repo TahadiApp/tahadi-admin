@@ -783,7 +783,7 @@
               <button class="btn gold" id="nudgeTest">🔔 أرسلها الآن للتجربة</button>
             </div>
             <div class="fhint" style="margin-top:8px;">
-              «أرسلها الآن» تخضع لنفس الشروط — من لعب اليوم لا يصله، ومن وصلته نبضة اليوم لا تتكرر عليه. فالضغط مرتين لا يرسل مرتين.
+              «أرسلها الآن» تعمل حتى والنبضة متوقفة، و<b>تصلك أنت دائماً</b> ولو لعبت اليوم — عشان تجرّبها متى ما تبي. أما بقية اللاعبين فعلى شروطهم: من لعب اليوم لا يصله، ومن وصلته نبضة اليوم لا تتكرر عليه.
             </div>
           </div>
         </div>
@@ -2352,8 +2352,16 @@ async function saveNudge(){
   },"حُفظت النبضة اليومية",loadNudge);
 }
 async function testNudge(){
-  await act(function(){ return sb.rpc("admin_send_daily_nudge"); },
-            "أُرسلت النبضة",loadNudge);
+  // ⚠️ **يُعرض العدد لا كلمة «تمّ»** — كان يقول «أُرسلت» والعدد صفر،
+  // وهو نجاحٌ يُبلَّغ عن لا شيء. والصفرُ هنا خبرٌ لا خطأ: يعني أن لا أحد
+  // تنطبق عليه الشروط الآن، ويجب أن يُقال كما هو.
+  await act(async function(){
+    const r=await sb.rpc("admin_send_daily_nudge");
+    if(r.error) throw r.error;
+    const n=(typeof r.data==="number")?r.data:0;
+    if(n>0) toast("أُرسلت لـ "+n+" لاعباً ✅","ok");
+    else    toast("لم تصل أحداً — ما فيه لاعب تنطبق عليه الشروط الآن","err");
+  },null,loadNudge);
 }
 
 async function loadPushSettings(){
