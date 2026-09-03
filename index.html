@@ -917,7 +917,7 @@ const setT=(id,v)=>{const e=document.getElementById(id); if(e) e.textContent=v;}
 const MODE_AR={online:"⚔️ المباشر",friends:"👫 الأصدقاء",room:"👥 الغرف",solo:"🎯 الفردي"};
 const ACT_AR={solo:"🎯 الفردي",online:"⚔️ المباشر",friends:"👫 الأصدقاء",rooms:"👥 الغرف",room:"👥 الغرف",home:"🏠 الرئيسية",chat:"💬 الدردشة",leaderboard:"🏆 الترتيب",stats:"📊 الإحصائيات",profile:"👤 الحساب",shop:"🛒 المتجر",other:"• أخرى"};
 const ACT_COLOR={solo:"#60A5FA",online:"#A855F7",friends:"#34D399",rooms:"#F472B6",room:"#F472B6",home:"#867AA6",shop:"#FB923C",other:"#867AA6"};
-const MODES=[["online","⚔️ التحدي المباشر"],["solo","🎯 التحدي الفردي"],["friends","👫 تحدي الأصدقاء"],["rooms","👥 الغرف الجماعية"]];
+const MODES=[["online","⚔️ التحدي المباشر"],["solo","🎯 التحدي الفردي"],["friends","👫 تحدي الأصدقاء"],["rooms","👥 الغرف الجماعية"],["chat","💬 الدردشة العامة"]];
 const SUB={overview:["نظرة عامة","كل مؤشرات التطبيق في مكان واحد"],players:["اللاعبون","بحث وتحكّم في الحسابات"],livechat:["الدردشة الحية","إشراف فوري على المحادثة"],content:["المحتوى","التصنيفات والبلاغات"],control:["التحكم والصيانة","الصيانة والتصنيفات والأوضاع"],broadcast:["البث","إشعارات وإعلانات"],staff:["المشرفون","الصلاحيات وسجل الإجراءات"],money:["المال والاسترداد","كل عملية شراء حقيقية ومصيرها"],security:["رصد النشاطات المشبوهة","كشف آلي للغش والشذوذ"]};
 const fmt=n=>(n==null?"—":Number(n).toLocaleString("en-US"));
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
