@@ -658,6 +658,21 @@
             <div class="fhint">تنطبق على كل الأوضاع. المباريات الجارية تُكمل بالقيمة القديمة؛ أي مباراة جديدة تبدأ بالقيمة الجديدة.</div>
           </div>
           <div class="card w12">
+            <div class="hd"><h3>🔥 مراتب وسم السلسلة</h3><span class="pill">يسري عند فتح التطبيق — بلا بناء جديد</span></div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end" id="stTiers">
+              <div style="width:120px"><label class="flbl">1 · مربع نحاسي</label><input class="fin num" id="stT1" type="number" min="1" max="9999"></div>
+              <div style="width:120px"><label class="flbl">2 · سداسي ذهبي</label><input class="fin num" id="stT2" type="number" min="1" max="9999"></div>
+              <div style="width:120px"><label class="flbl">3 · درع ذهبي</label><input class="fin num" id="stT3" type="number" min="1" max="9999"></div>
+              <div style="width:120px"><label class="flbl">4 · نجمة ثمانية</label><input class="fin num" id="stT4" type="number" min="1" max="9999"></div>
+              <div style="width:120px"><label class="flbl">5 · ميدالية بلاتينية</label><input class="fin num" id="stT5" type="number" min="1" max="9999"></div>
+              <div style="width:120px"><label class="flbl">6 · ماسة زرقاء</label><input class="fin num" id="stT6" type="number" min="1" max="9999"></div>
+              <div style="width:120px"><label class="flbl">7 · شعلة أسطورية</label><input class="fin num" id="stT7" type="number" min="1" max="9999"></div>
+              <div style="width:120px"><label class="flbl">8 · شمس ذهبية</label><input class="fin num" id="stT8" type="number" min="1" max="9999"></div>
+              <button class="btn primary" id="stSave">حفظ</button>
+            </div>
+            <div class="fhint">يوم بدء كل شكل من أشكال وسم السلسلة الثمانية (الأول = 1 دائماً). يجب أن تكون الأيام تصاعدية. مكافآت المحافظة نفسها تُدار من مفتاح <code>streak.rewards</code> ولا تتغيّر هنا.</div>
+          </div>
+          <div class="card w12">
             <div class="hd"><h3>🎯 نظام المراحل (التحدي الفردي)</h3><span class="pill">يسري فوراً — بلا بناء جديد</span></div>
             <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end">
               <div style="width:150px"><label class="flbl">عدد المراحل</label><input class="fin num" id="slTotal" type="number" min="1" max="5000"></div>
@@ -1305,6 +1320,7 @@ $("#adSave").addEventListener("click",saveAds);
 $("#noticeSend").addEventListener("click",sendNotice);
 $("#noticeCancel").addEventListener("click",cancelNotice);
 $("#mcSave").addEventListener("click",saveMatch);
+$("#stSave").addEventListener("click",saveStreakTiers);
 $("#slSave").addEventListener("click",saveLadder);
 $("#bcSend").addEventListener("click",broadcast);
 $("#pushSave").addEventListener("click",savePushSettings);
@@ -2074,6 +2090,11 @@ async function loadControl(){
     $("#mcCountdown").value=v.countdown_seconds ?? 3;
   }catch(e){}
   try{
+    const st=await sb.from("app_config").select("value").eq("key","streak").single();
+    const tiers=(st.data&&st.data.value&&Array.isArray(st.data.value.badge_tiers))?st.data.value.badge_tiers:[1,5,10,20,30,50,100,365];
+    for(let i=1;i<=8;i++) $("#stT"+i).value=tiers[i-1] ?? "";
+  }catch(e){}
+  try{
     const l=await sb.from("app_config").select("value").eq("key","solo_ladder").single();
     const v=(l.data&&l.data.value)||{};
     $("#slTotal").value=v.total_stages ?? 400;
@@ -2230,6 +2251,17 @@ async function saveMatch(){
     const v={...(c.data.value||{}), seconds_per_question:sec, questions_per_match:q, countdown_seconds:cd};
     const{error}=await sb.from("app_config").update({value:v}).eq("key","match"); if(error)throw error;
   },"تم حفظ إعدادات المباراة");
+}
+async function saveStreakTiers(){
+  const days=[]; for(let i=1;i<=8;i++){ const d=parseInt($("#stT"+i).value,10); if(!(d>=1&&d<=9999)){ toast("يوم المرتبة "+i+" يجب أن يكون بين 1 و9999","err"); return; } days.push(d); }
+  for(let i=1;i<8;i++){ if(!(days[i]>days[i-1])){ toast("الأيام يجب أن تكون تصاعدية: المرتبة "+(i+1)+" قبل "+i,"err"); return; } }
+  await act(async()=>{
+    // ندمج داخل مفتاح `streak` القائم — فيه المكافآت والنوافذ ولا تُمسّ.
+    const c=await sb.from("app_config").select("value").eq("key","streak").single();
+    if(c.error||!c.data) throw c.error||new Error("تعذّرت قراءة إعدادات السلسلة — لم يُحفظ شيء");
+    const v={...(c.data.value||{}), badge_tiers:days};
+    const{error}=await sb.from("app_config").update({value:v}).eq("key","streak"); if(error)throw error;
+  },"تم حفظ أيام مراتب الوسم");
 }
 async function saveMaintenance(){
   const enabled=$("#maintToggle").checked, message=$("#maintMsg").value.trim();
