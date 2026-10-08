@@ -2865,17 +2865,29 @@ async function refreshSlow(){try{
   const k=document.querySelector("#topsTabs .btn.primary")?.dataset.k||"coins";
   loadTops(k,true); susBadge();
 }catch(e){}}
+// The pulse was every 3s: five RPCs costing the database ~10s of every minute
+// (~17% of a core) on a 0.5 GB server that ran out of disk IO budget
+// (2026-10-08). 15s for the idle pulse; live events still land within 3s.
 function startLoop(){
   if(loopId)clearInterval(loopId);
-  loopId=setInterval(()=>{ if(!document.hidden) refreshFast(); },3000);
+  loopId=setInterval(()=>{ if(!document.hidden) refreshFast(); },15000);
   if(slowId)clearInterval(slowId);
   slowId=setInterval(()=>{ if(!document.hidden) refreshSlow(); },30000);
 }
+// A live match fires a change every few seconds per player — coalesce a burst
+// into one refresh 3s later instead of five RPCs per row.
+let fastTimer=null;
+function refreshFastSoon(){
+  if(fastTimer) return;
+  fastTimer=setTimeout(()=>{ fastTimer=null; if(!document.hidden) refreshFast(); },3000);
+}
+// Back on the tab: refresh now, so a 15s pulse never shows a stale number.
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && loopId) refreshFast(); });
 function startRealtime(){
   sb.channel("admin-live")
-    .on("postgres_changes",{event:"*",schema:"public",table:"matches"},refreshFast)
-    .on("postgres_changes",{event:"*",schema:"public",table:"match_players"},refreshFast)
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"question_reports"},refreshFast)
+    .on("postgres_changes",{event:"*",schema:"public",table:"matches"},refreshFastSoon)
+    .on("postgres_changes",{event:"*",schema:"public",table:"match_players"},refreshFastSoon)
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"question_reports"},refreshFastSoon)
     .on("postgres_changes",{event:"INSERT",schema:"public",table:"chat_messages"},()=>{ if(!document.hidden && $("#v-livechat").classList.contains("on")) loadChat(); })
     .subscribe();
 }
